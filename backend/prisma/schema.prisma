@@ -1,0 +1,75 @@
+// Este ficheiro define a estrutura das tabelas no Banco de Dados
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Usando SQLite para desenvolvimento local rápido
+  url      = "file:./dev.db"
+}
+
+// Modelo do Advogado (Escritório/Tenant)
+model Lawyer {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  logoUrl       String?
+  primaryColor  String    @default("#4f46e5")
+  clients       Client[]
+  cases         Case[]
+  createdAt     DateTime  @default(now())
+}
+
+// Modelo de Cliente
+model Client {
+  id          String      @id @default(uuid())
+  name        String
+  phone       String
+  email       String?
+  lawyer      Lawyer      @relation(fields: [lawyerId], references: [id])
+  lawyerId    String
+  cases       Case[]
+  financials  Financial[]
+  createdAt   DateTime    @default(now())
+}
+
+// Modelo de Processo Jurídico
+model Case {
+  id            String         @id @default(uuid())
+  title         String
+  status        String         @default("Em Andamento")
+  stage         String         @default("peticao")
+  anxietyScore  Int            @default(50)
+  client        Client         @relation(fields: [clientId], references: [id])
+  clientId      String
+  lawyer        Lawyer         @relation(fields: [lawyerId], references: [id])
+  lawyerId    String
+  timeline      TimelineStep[]
+  updatedAt     DateTime       @updatedAt
+}
+
+// Passos da Linha do Tempo (iFood Style)
+model TimelineStep {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  date        String
+  completed   Boolean  @default(false)
+  isCurrent   Boolean  @default(false)
+  case        Case     @relation(fields: [caseId], references: [id])
+  caseId      String
+}
+
+// Controle Financeiro
+model Financial {
+  id        String   @id @default(uuid())
+  title     String
+  amount    Float
+  dueDate   String
+  status    String   @default("Aberto") // Pago, Atrasado, Aberto
+  type      String   @default("Boleto")
+  client    Client   @relation(fields: [clientId], references: [id])
+  clientId  String
+}
