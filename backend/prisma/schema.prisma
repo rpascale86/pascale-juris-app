@@ -5,9 +5,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite" // Usando SQLite para desenvolvimento local rápido
-  url      = "file:./dev.db"
+  provider = "postgresql" // Mudou de sqlite para postgresql
+  url      = env("DATABASE_URL")
 }
+
 
 // Modelo do Advogado (Escritório/Tenant)
 model Lawyer {
