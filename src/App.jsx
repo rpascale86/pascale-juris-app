@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO ---
-const API_URL = 'http://localhost:3001/api'; // Endereço do seu Backend
+//const API_URL = 'http://localhost:3001/api'; // Endereço do seu Backend
+const API_URL = 'https://pascale-juris-app.onrender.com/api'; // Endereço do seu Backend
 
 const TENANT_CONFIG = {
   name: "Lopes & Associados",
