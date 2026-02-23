@@ -1,16 +1,15 @@
-// Este ficheiro define a estrutura das tabelas no Banco de Dados
-
+// Configuração para Prisma + PostgreSQL
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql" // Mudou de sqlite para postgresql
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// --- MODELOS DO SISTEMA OTIMIZADOS ---
 
-// Modelo do Advogado (Escritório/Tenant)
 model Lawyer {
   id            String    @id @default(uuid())
   email         String    @unique
@@ -21,37 +20,63 @@ model Lawyer {
   clients       Client[]
   cases         Case[]
   createdAt     DateTime  @default(now())
+
+  // Boa prática: Força o nome da tabela em minúsculas e no plural no banco de dados real
+  @@map("lawyers") 
 }
 
-// Modelo de Cliente
 model Client {
   id          String      @id @default(uuid())
   name        String
+  
+  // DADOS PESSOAIS COMPLETOS
+  cpf         String?     @unique
+  rg          String?
   phone       String
   email       String?
-  lawyer      Lawyer      @relation(fields: [lawyerId], references: [id])
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  profession  String?
+  civilState  String?
+
+  // OTIMIZAÇÃO: Cascade delete - se apagar o advogado, apaga o cliente
+  lawyer      Lawyer      @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
   lawyerId    String
   cases       Case[]
   financials  Financial[]
   createdAt   DateTime    @default(now())
+
+  // OTIMIZAÇÃO: Acelera absurdamente a busca por nome e CPF
+  @@index([name]) 
+  @@index([cpf])
+  @@index([lawyerId]) 
+  @@map("clients")
 }
 
-// Modelo de Processo Jurídico
 model Case {
   id            String         @id @default(uuid())
   title         String
   status        String         @default("Em Andamento")
   stage         String         @default("peticao")
   anxietyScore  Int            @default(50)
-  client        Client         @relation(fields: [clientId], references: [id])
+  
+  // OTIMIZAÇÃO: Cascade delete - se apagar o cliente, os processos dele também somem
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId      String
-  lawyer        Lawyer         @relation(fields: [lawyerId], references: [id])
-  lawyerId    String
+  
+  lawyer        Lawyer         @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+  lawyerId      String
   timeline      TimelineStep[]
   updatedAt     DateTime       @updatedAt
+
+  // OTIMIZAÇÃO: Acelera a listagem de processos ordenados pelo mais recente no Kanban
+  @@index([updatedAt(sort: Desc)]) 
+  @@index([clientId])
+  @@map("cases")
 }
 
-// Passos da Linha do Tempo (iFood Style)
 model TimelineStep {
   id          String   @id @default(uuid())
   title       String
@@ -59,18 +84,29 @@ model TimelineStep {
   date        String
   completed   Boolean  @default(false)
   isCurrent   Boolean  @default(false)
-  case        Case     @relation(fields: [caseId], references: [id])
+  
+  // OTIMIZAÇÃO: Cascade delete - se apagar o processo, o histórico é limpo
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseId      String
+
+  @@index([caseId])
+  @@map("timeline_steps")
 }
 
-// Controle Financeiro
 model Financial {
   id        String   @id @default(uuid())
   title     String
   amount    Float
   dueDate   String
-  status    String   @default("Aberto") // Pago, Atrasado, Aberto
+  status    String   @default("Aberto")
   type      String   @default("Boleto")
-  client    Client   @relation(fields: [clientId], references: [id])
+  
+  // OTIMIZAÇÃO: Cascade delete - se apagar o cliente, as faturas pendentes também somem
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId  String
+
+  // OTIMIZAÇÃO: Acelera a listagem de faturas que estão prestes a vencer
+  @@index([dueDate(sort: Asc)]) 
+  @@index([clientId])
+  @@map("financials")
 }

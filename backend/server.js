@@ -8,11 +8,9 @@ dotenv.config();
 const prisma = new PrismaClient();
 const app = express();
 
-// 🚀 OTIMIZAÇÃO 1: Segurança de CORS Restrita (Substitua a URL da Vercel pela sua real)
 const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://pascale-juris-app.vercel.app'];
 app.use(cors({
   origin: function(origin, callback) {
-    // Permite ferramentas como Postman (origin nulo) ou os domínios da lista
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -26,12 +24,11 @@ app.use(express.json());
 // --- ROTAS DE LEITURA ---
 
 app.get('/api/health', async (req, res) => {
-  // 🚀 OTIMIZAÇÃO 2: Healthcheck Real (faz um mini-ping no banco)
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'Operacional', database: 'PostgreSQL Conectado e Respondendo' });
+    res.json({ status: 'Operacional', database: 'PostgreSQL Conectado e a Responder' });
   } catch (e) {
-    res.status(500).json({ status: 'Erro', database: 'Falha na conexão com o banco de dados' });
+    res.status(500).json({ status: 'Erro', database: 'Falha na conexão com a base de dados' });
   }
 });
 
@@ -39,14 +36,13 @@ app.get('/api/cases', async (req, res) => {
   try {
     const cases = await prisma.case.findMany({
       include: { client: true, timeline: true },
-      // 🚀 OTIMIZAÇÃO 3: Ordenação e Limite (Impede travamentos futuros)
       orderBy: { updatedAt: 'desc' }, 
       take: 200 
     });
     res.json(cases);
   } catch (error) {
-    console.error("Erro ao buscar processos:", error);
-    res.status(500).json({ error: 'Erro interno ao buscar processos' });
+    console.error("Erro ao procurar processos:", error);
+    res.status(500).json({ error: 'Erro interno ao procurar processos' });
   }
 });
 
@@ -54,12 +50,12 @@ app.get('/api/financials', async (req, res) => {
   try {
     const financials = await prisma.financial.findMany({
       include: { client: true },
-      orderBy: { dueDate: 'asc' } // Traz primeiro as faturas que estão prestes a vencer
+      orderBy: { dueDate: 'asc' }
     });
     res.json(financials);
   } catch (error) {
     console.error("Erro no financeiro:", error);
-    res.status(500).json({ error: 'Erro interno ao buscar financeiro' });
+    res.status(500).json({ error: 'Erro interno ao procurar financeiro' });
   }
 });
 
@@ -69,7 +65,6 @@ app.patch('/api/cases/:id/move', async (req, res) => {
   const { id } = req.params;
   const { stage, status } = req.body;
 
-  // 🚀 OTIMIZAÇÃO 4: Validação Fail-Fast
   if (!stage || !status) {
     return res.status(400).json({ error: 'Faltam parâmetros obrigatórios (stage, status).' });
   }
@@ -83,16 +78,16 @@ app.patch('/api/cases/:id/move', async (req, res) => {
     res.json(updatedCase);
   } catch (error) {
     console.error("Erro ao mover processo:", error);
-    res.status(500).json({ error: 'Erro ao atualizar processo no banco.' });
+    res.status(500).json({ error: 'Erro ao atualizar processo na base de dados.' });
   }
 });
 
+// CRIAÇÃO DE NOVO PROCESSO E CLIENTE COM DADOS COMPLETOS
 app.post('/api/cases', async (req, res) => {
-  const { client, phone, title } = req.body;
+  const { client, cpf, phone, title } = req.body;
 
-  // Validação Fail-Fast
   if (!client || !title) {
-    return res.status(400).json({ error: 'Nome do cliente e título da ação são obrigatórios.' });
+    return res.status(400).json({ error: 'Nome do cliente e título da acção são obrigatórios.' });
   }
 
   try {
@@ -101,15 +96,34 @@ app.post('/api/cases', async (req, res) => {
       return res.status(400).json({ error: 'Nenhum advogado encontrado na base de dados.' });
     }
 
-    let dbClient = await prisma.client.findFirst({
-      where: { name: client }
-    });
+    // Procura cliente primeiro pelo CPF, depois pelo Nome
+    let dbClient = null;
+    if (cpf) {
+      dbClient = await prisma.client.findFirst({ where: { cpf } });
+    }
+    if (!dbClient) {
+      dbClient = await prisma.client.findFirst({ where: { name: client } });
+    }
 
+    // Se não existe, cria um novo
     if (!dbClient) {
       dbClient = await prisma.client.create({
-        data: { name: client, phone: phone || '', lawyerId: lawyer.id }
+        data: { 
+          name: client, 
+          cpf: cpf || null, 
+          phone: phone || '', 
+          lawyerId: lawyer.id 
+        }
       });
-      console.log(`👤 Novo cliente cadastrado: ${client}`);
+      console.log(`👤 Novo cliente registado: ${client} (CPF: ${cpf})`);
+    } else {
+      // Se o cliente existe mas não tinha CPF registado, atualiza
+      if (cpf && !dbClient.cpf) {
+        await prisma.client.update({
+          where: { id: dbClient.id },
+          data: { cpf }
+        });
+      }
     }
 
     const newCase = await prisma.case.create({
@@ -179,14 +193,12 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 const server = app.listen(PORT, () => {
-  console.log(`\n⚖️  PASCALE JURIS BACKEND (ENTERPRISE)`);
+  console.log(`\n⚖️  PASCALE JURIS BACKEND`);
   console.log(`🚀 API Pronta: http://localhost:${PORT}`);
 });
 
-// 🚀 OTIMIZAÇÃO 5: Graceful Shutdown
-// Previne conexões pendentes no banco de dados quando o Render reinicia a máquina
 process.on('SIGTERM', async () => {
-  console.log('🔴 Sinal SIGTERM recebido. Fechando conexões com o Prisma...');
+  console.log('🔴 Sinal SIGTERM recebido. A fechar conexões com o Prisma...');
   await prisma.$disconnect();
   server.close(() => {
     console.log('✅ Servidor HTTP encerrado com segurança.');

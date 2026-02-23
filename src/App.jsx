@@ -55,37 +55,6 @@ const DEFAULT_CASES = [
     stage: "analise_juiz",
     anxietyScore: 85, 
     lastUpdate: "Há 2 dias",
-    nextStep: "Aguardar despacho",
-    timeline: [
-      { id: 1, title: "Petição Inicial", date: "10/01/2024", completed: true, desc: "Enviamos o seu pedido ao juiz." },
-      { id: 2, title: "Citação do Réu", date: "15/01/2024", completed: true, desc: "O Banco foi notificado do processo." },
-      { id: 3, title: "Análise do Juiz", date: "Hoje", completed: false, current: true, desc: "O juiz está analisando nossos argumentos. Isso demora em média 20 dias." },
-      { id: 4, title: "Audiência", date: "Pendente", completed: false, desc: "Reunião para ouvir testemunhas." },
-      { id: 5, title: "Sentença", date: "Pendente", completed: false, desc: "Decisão final do juiz." }
-    ]
-  },
-  {
-    id: 2,
-    client: "Mariana Souza",
-    phone: "11988888888",
-    title: "Divórcio Consensual",
-    status: "A Finalizar",
-    stage: "sentenca",
-    anxietyScore: 10,
-    lastUpdate: "Há 1 hora",
-    nextStep: "Averbação",
-    timeline: []
-  },
-  {
-    id: 3,
-    client: "Tech Solutions LTDA",
-    phone: "11977777777",
-    title: "Recuperação Fiscal",
-    status: "Inicial",
-    stage: "peticao",
-    anxietyScore: 40,
-    lastUpdate: "Há 5 dias",
-    nextStep: "Protocolo",
     timeline: []
   }
 ];
@@ -96,7 +65,7 @@ const DEFAULT_LEADS = [
 ];
 
 const DEFAULT_MESSAGES = [
-  { id: 1, text: "Olá Carlos! Vi que acessou o portal. Tem alguma dúvida sobre a etapa atual?", sender: 'bot', time: '10:30' }
+  { id: 1, text: "Olá! Vi que acessou o portal. Tem alguma dúvida?", sender: 'bot', time: '10:30' }
 ];
 
 const DEFAULT_DOCUMENTS = [
@@ -104,10 +73,7 @@ const DEFAULT_DOCUMENTS = [
 ];
 
 const DEFAULT_FINANCIALS = [
-  { id: 1, title: "Honorários Iniciais", client: "Carlos Silva", amount: 2500.00, dueDate: "10/01/2024", status: "Pago", type: "Pix" },
-  { id: 2, title: "Parcela 2/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/02/2024", status: "Atrasado", type: "Boleto" },
-  { id: 3, title: "Parcela 3/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/03/2024", status: "Aberto", type: "Boleto" },
-  { id: 4, title: "Honorários Finais", client: "Mariana Souza", amount: 1200.00, dueDate: "15/02/2024", status: "Aberto", type: "Cartão" },
+  { id: 1, title: "Honorários Iniciais", client: "Carlos Silva", amount: 2500.00, dueDate: "2024-01-10", status: "Pago", type: "Pix" },
 ];
 
 // --- HOOKS DE PERSISTÊNCIA ---
@@ -137,13 +103,21 @@ const formatDate = (dateString) => {
   return dateString;
 };
 
-// 🚀 OTIMIZAÇÃO: Centraliza a lógica de formatação de telefone
+// 🚀 BUG CORRIGIDO: Máscara de Telefone à prova de falhas usando RegEx puro
 const applyPhoneMask = (value) => {
   let v = value.replace(/\D/g, ''); 
-  if (v.length > 11) v = v.slice(0, 11); 
-  if (v.length > 2) v = `(${v.slice(0, 2)}) ${v.slice(2)}`;
-  if (v.length > 7) v = `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
-  return v;
+  if (v.length <= 2) return v.replace(/(\d{2})/, '($1');
+  if (v.length <= 7) return v.replace(/(\d{2})(\d{1,5})/, '($1) $2');
+  return v.replace(/(\d{2})(\d{5})(\d{1,4})/, '($1) $2-$3').slice(0, 15);
+};
+
+// 🚀 NOVA MÁSCARA: Validação visual para CPF
+const applyCpfMask = (value) => {
+  let v = value.replace(/\D/g, '');
+  if (v.length <= 3) return v;
+  if (v.length <= 6) return v.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+  if (v.length <= 9) return v.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+  return v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4').slice(0, 14);
 };
 
 // --- COMPONENTES DE INTERFACE ---
@@ -229,11 +203,6 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
   const [formData, setFormData] = useState({ name: '', phone: '', type: 'Usucapião' });
   const [showNotification, setShowNotification] = useState(false);
 
-  const handlePhoneChange = (e) => {
-    // 🚀 OTIMIZAÇÃO: Usa a função global
-    setFormData({ ...formData, phone: applyPhoneMask(e.target.value) });
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     const rawPhone = formData.phone.replace(/\D/g, '');
@@ -276,7 +245,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Celular</label>
-              <input required type="tel" minLength={14} maxLength={15} className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="(11) 99999-9999" value={formData.phone} onChange={handlePhoneChange} />
+              <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="(11) 99999-9999" value={formData.phone} onChange={e => setFormData({...formData, phone: applyPhoneMask(e.target.value)})} />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Caso</label>
@@ -345,7 +314,6 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
   const [showNotification, setShowNotification] = useState(false);
   const chatEndRef = useRef(null);
 
-  // 🚀 OTIMIZAÇÃO: Memoriza os dados financeiros do cliente logado
   const { myFinancials, totalPendente } = useMemo(() => {
     if (!caseData) return { myFinancials: [], totalPendente: 0 };
     const filtered = financials.filter(f => f.client === caseData.client || f.client === "Carlos Silva");
@@ -541,12 +509,10 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // 🚀 OTIMIZAÇÃO: useMemo para não recalcular clientes a cada digitação nos formulários
   const activeClients = useMemo(() => {
     return Array.from(new Set(cases.map(c => typeof c.client === 'object' ? c.client?.name : c.client))).filter(Boolean);
   }, [cases]);
 
-  // 🚀 OTIMIZAÇÃO: useMemo para cálculos financeiros (Não bloqueia a thread de renderização)
   const { totalRevenue, openRevenue, lateRevenue } = useMemo(() => {
     return {
       totalRevenue: financials.filter(f => f.status === 'Pago').reduce((acc, curr) => acc + curr.amount, 0),
@@ -555,32 +521,25 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     };
   }, [financials]);
 
-  // 🚀 OTIMIZAÇÃO: Agrupamento Kanban único
   const groupedCases = useMemo(() => ({
     peticao: cases.filter(c => c.stage === 'peticao'),
     analise_juiz: cases.filter(c => c.stage === 'analise_juiz'),
     sentenca: cases.filter(c => c.stage === 'sentenca')
   }), [cases]);
 
-  // Estados dos Modais
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
   const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
 
-  // Estados dos Formulários
-  const [newCaseData, setNewCaseData] = useState({ client: '', phone: '', title: '' });
+  // 🚀 ATUALIZADO: Agora suporta CPF na criação do processo
+  const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '' });
   const [newDocData, setNewDocData] = useState({ name: '', client: '' });
   
-  // Estado Inteligente para o Financeiro
   const [newFinData, setNewFinData] = useState({ client: '', amount: '', dueDate: '', type: 'Boleto' });
   const [finChargeType, setFinChargeType] = useState('Honorários Iniciais');
   const [finTotalInstallments, setFinTotalInstallments] = useState(10);
   const [finCurrentInstallment, setFinCurrentInstallment] = useState(1);
   const [finCustomTitle, setFinCustomTitle] = useState('');
-
-  const handleNewCasePhoneChange = (e) => {
-    setNewCaseData({ ...newCaseData, phone: applyPhoneMask(e.target.value) });
-  };
 
   useEffect(() => {
     if (globalNotifications && globalNotifications.length > 0) {
@@ -644,7 +603,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     }
     onAddCase(newCaseData);
     setIsAddCaseModalOpen(false);
-    setNewCaseData({ client: '', phone: '', title: '' });
+    setNewCaseData({ client: '', cpf: '', phone: '', title: '' });
     setNotification({ title: "Processo Cadastrado", message: "Enviado para a Nuvem com sucesso.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
@@ -712,20 +671,22 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </div>
       )}
 
-      {/* Modal Novo Processo */}
+      {/* 🚀 ATUALIZADO: Modal Novo Processo agora pede CPF */}
       <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Cadastrar Novo Processo (Nuvem)">
         <form onSubmit={handleAddNewCase} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo do Cliente</label>
             <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: João da Silva" value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} />
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp (Celular apenas números)</label>
-            <input 
-              required type="tel" minLength={14} maxLength={15} 
-              className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" 
-              placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={handleNewCasePhoneChange} 
-            />
+          <div className="flex gap-4">
+            <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF</label>
+                <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="000.000.000-00" value={newCaseData.cpf} onChange={e => setNewCaseData({...newCaseData, cpf: applyCpfMask(e.target.value)})} />
+            </div>
+            <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+                <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: applyPhoneMask(e.target.value)})} />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Ação</label>
@@ -737,7 +698,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </form>
       </Modal>
 
-      {/* Modal Nova Fatura (INTELIGENTE) */}
+      {/* Modal Nova Fatura */}
       <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura (Nuvem)">
         <form onSubmit={handleAddNewFin} className="space-y-4">
           <div>
@@ -1162,7 +1123,7 @@ export default function App() {
     }
   };
 
-  // ➕ 3. NOVO PROCESSO (ENVIAR PARA A NUVEM)
+  // ➕ 3. NOVO PROCESSO E CLIENTE COMPLETO (ENVIAR PARA A NUVEM)
   const addCase = async (newCaseData) => {
     const tempId = Date.now().toString();
     const novoProcesso = {
@@ -1296,9 +1257,6 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
       `}</style>
-
-      {/* Controle Master comentado para manter o foco na Gestão */}
-
       {renderView()}
     </div>
   );
