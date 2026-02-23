@@ -63,6 +63,30 @@ const DEFAULT_CASES = [
       { id: 4, title: "Audiência", date: "Pendente", completed: false, desc: "Reunião para ouvir testemunhas." },
       { id: 5, title: "Sentença", date: "Pendente", completed: false, desc: "Decisão final do juiz." }
     ]
+  },
+  {
+    id: 2,
+    client: "Mariana Souza",
+    phone: "11988888888",
+    title: "Divórcio Consensual",
+    status: "A Finalizar",
+    stage: "sentenca",
+    anxietyScore: 10,
+    lastUpdate: "Há 1 hora",
+    nextStep: "Averbação",
+    timeline: []
+  },
+  {
+    id: 3,
+    client: "Tech Solutions LTDA",
+    phone: "11977777777",
+    title: "Recuperação Fiscal",
+    status: "Inicial",
+    stage: "peticao",
+    anxietyScore: 40,
+    lastUpdate: "Há 5 dias",
+    nextStep: "Protocolo",
+    timeline: []
   }
 ];
 
@@ -81,7 +105,9 @@ const DEFAULT_DOCUMENTS = [
 
 const DEFAULT_FINANCIALS = [
   { id: 1, title: "Honorários Iniciais", client: "Carlos Silva", amount: 2500.00, dueDate: "10/01/2024", status: "Pago", type: "Pix" },
-  { id: 2, title: "Parcela 2/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/02/2024", status: "Atrasado", type: "Boleto" }
+  { id: 2, title: "Parcela 2/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/02/2024", status: "Atrasado", type: "Boleto" },
+  { id: 3, title: "Parcela 3/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/03/2024", status: "Aberto", type: "Boleto" },
+  { id: 4, title: "Honorários Finais", client: "Mariana Souza", amount: 1200.00, dueDate: "15/02/2024", status: "Aberto", type: "Cartão" },
 ];
 
 // --- HOOKS DE PERSISTÊNCIA ---
@@ -106,7 +132,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
           <h3 className="font-bold text-lg">{title}</h3>
           <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto max-h-[80vh]">
           {children}
         </div>
       </div>
@@ -118,7 +144,7 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-// FUNÇÃO NOVA: Formatar data do padrão internacional (AAAA-MM-DD) para brasileiro (DD/MM/AAAA)
+// Formatar data do padrão internacional (AAAA-MM-DD) para brasileiro (DD/MM/AAAA)
 const formatDate = (dateString) => {
   if (!dateString) return '';
   if (dateString.includes('-')) {
@@ -502,6 +528,9 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // Extrai apenas os nomes únicos de clientes que têm processos na base de dados
+  const activeClients = Array.from(new Set(cases.map(c => typeof c.client === 'object' ? c.client?.name : c.client))).filter(Boolean);
+
   // Estados dos Modais
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
   const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
@@ -509,12 +538,16 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
   // Estados dos Formulários
   const [newCaseData, setNewCaseData] = useState({ client: '', phone: '', title: '' });
-  const [newFinData, setNewFinData] = useState({ title: '', client: '', amount: '', dueDate: '', type: 'Boleto' });
   const [newDocData, setNewDocData] = useState({ name: '', client: '' });
+  
+  // Estado Inteligente para o Financeiro
+  const [newFinData, setNewFinData] = useState({ client: '', amount: '', dueDate: '', type: 'Boleto' });
+  const [finChargeType, setFinChargeType] = useState('Honorários Iniciais');
+  const [finTotalInstallments, setFinTotalInstallments] = useState(10);
+  const [finCurrentInstallment, setFinCurrentInstallment] = useState(1);
+  const [finCustomTitle, setFinCustomTitle] = useState('');
 
-  // EVITA LETRAS E APLICA MÁSCARA
   const handleNewCasePhoneChange = (e) => {
-    // Pega tudo o que foi digitado, remove letras na hora
     let value = e.target.value.replace(/\D/g, ''); 
     if (value.length > 11) value = value.slice(0, 11); 
     let formatted = value;
@@ -573,18 +606,16 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     setTimeout(() => setNotification(null), 7000);
   };
 
-  // Funções de Submissão - AGORA COM NOTIFICAÇÃO SUAVE EM VEZ DE ALERT()
+  // --- FUNÇÕES DE SUBMISSÃO DOS FORMULÁRIOS ---
+
   const handleAddNewCase = (e) => {
     e.preventDefault();
     const rawPhone = newCaseData.phone.replace(/\D/g, '');
-    
-    // Se o telefone não for válido, exibe notificação amigável e impede o travamento
     if (rawPhone.length < 10) {
       setNotification({ title: "Telefone Inválido", message: "Por favor, digite apenas números, incluindo o DDD.", type: "warning" });
       setTimeout(() => setNotification(null), 4000);
       return; 
     }
-    
     onAddCase(newCaseData);
     setIsAddCaseModalOpen(false);
     setNewCaseData({ client: '', phone: '', title: '' });
@@ -592,17 +623,45 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // FATURA INTELIGENTE
   const handleAddNewFin = (e) => {
     e.preventDefault();
-    onAddFinancial(newFinData);
+    
+    if (!newFinData.client) {
+      setNotification({ title: "Atenção", message: "Selecione um cliente da lista.", type: "warning" });
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
+
+    // Lógica para montar o título da fatura
+    let finalTitle = finChargeType;
+    if (finChargeType === 'Parcelamento') {
+      finalTitle = `Parcela ${finCurrentInstallment}/${finTotalInstallments}`;
+    } else if (finChargeType === 'Outro') {
+      finalTitle = finCustomTitle;
+    }
+
+    onAddFinancial({ ...newFinData, title: finalTitle });
+    
+    // Reseta o formulário
     setIsAddFinModalOpen(false);
-    setNewFinData({ title: '', client: '', amount: '', dueDate: '', type: 'Boleto' });
+    setNewFinData({ client: '', amount: '', dueDate: '', type: 'Boleto' });
+    setFinChargeType('Honorários Iniciais');
+    setFinCurrentInstallment(1);
+    setFinTotalInstallments(10);
+    setFinCustomTitle('');
+    
     setNotification({ title: "Fatura Lançada", message: "Gravada no Banco de Dados.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
 
   const handleAddNewDoc = (e) => {
     e.preventDefault();
+    if (!newDocData.client) {
+      setNotification({ title: "Atenção", message: "Selecione um cliente da lista.", type: "warning" });
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
     onAddDocument(newDocData);
     setIsAddDocModalOpen(false);
     setNewDocData({ name: '', client: '' });
@@ -655,17 +714,49 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </form>
       </Modal>
 
-      {/* Modal Nova Fatura */}
+      {/* Modal Nova Fatura (INTELIGENTE) */}
       <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura (Nuvem)">
         <form onSubmit={handleAddNewFin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
-            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Carlos Silva" value={newFinData.client} onChange={e => setNewFinData({...newFinData, client: e.target.value})} />
+            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.client} onChange={e => setNewFinData({...newFinData, client: e.target.value})}>
+              <option value="">Selecione um cliente ativo...</option>
+              {activeClients.map(clientName => (
+                <option key={clientName} value={clientName}>{clientName}</option>
+              ))}
+            </select>
           </div>
+          
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição da Fatura</label>
-            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Honorários Iniciais" value={newFinData.title} onChange={e => setNewFinData({...newFinData, title: e.target.value})} />
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Cobrança</label>
+            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finChargeType} onChange={e => setFinChargeType(e.target.value)}>
+              <option value="Honorários Iniciais">Honorários Iniciais</option>
+              <option value="Honorários Finais">Honorários Finais</option>
+              <option value="Parcelamento">Parcelamento mensal</option>
+              <option value="Outro">Outra descrição (Livre)</option>
+            </select>
           </div>
+
+          {finChargeType === 'Parcelamento' && (
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parcela Atual</label>
+                <input required type="number" min="1" max={finTotalInstallments} className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finCurrentInstallment} onChange={e => setFinCurrentInstallment(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">De (Total)</label>
+                <input required type="number" min="2" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finTotalInstallments} onChange={e => setFinTotalInstallments(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {finChargeType === 'Outro' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição Livre</label>
+              <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Custas Judiciais / Emissão Documentos" value={finCustomTitle} onChange={e => setFinCustomTitle(e.target.value)} />
+            </div>
+          )}
+
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
@@ -695,13 +786,18 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         <form onSubmit={handleAddNewDoc} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
-            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Carlos Silva" value={newDocData.client} onChange={e => setNewDocData({...newDocData, client: e.target.value})} />
+            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newDocData.client} onChange={e => setNewDocData({...newDocData, client: e.target.value})}>
+              <option value="">Selecione um cliente ativo...</option>
+              {activeClients.map(clientName => (
+                <option key={clientName} value={clientName}>{clientName}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Arquivo</label>
             <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Contrato_Assinado.pdf" value={newDocData.name} onChange={e => setNewDocData({...newDocData, name: e.target.value})} />
           </div>
-          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50">
+          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-indigo-400 transition">
              <UploadCloud className="w-8 h-8 mb-2 text-indigo-300" />
              <p className="text-xs font-bold">Anexar arquivo falso para teste</p>
           </div>
@@ -791,7 +887,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <tr key={fin.id} className="hover:bg-slate-50/50 transition duration-300">
                            <td className="p-4 md:p-8 font-bold text-slate-800">{fin.title}</td>
                            <td className="p-4 md:p-8 text-slate-600 font-medium">{fin.client}</td>
-                           {/* AQUI APLICAMOS A FUNÇÃO PARA TRADUZIR A DATA */}
                            <td className="p-4 md:p-8 text-slate-500 font-medium">{formatDate(fin.dueDate)}</td>
                            <td className="p-4 md:p-8 font-extrabold text-slate-800">{formatCurrency(fin.amount)}</td>
                            <td className="p-4 md:p-8"><span className={`px-3 md:px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase tracking-tight ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{fin.status}</span></td>
