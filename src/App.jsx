@@ -34,7 +34,8 @@ import {
   Calendar
 } from 'lucide-react';
 
-// --- CONFIGURAÇÃO E DADOS INICIAIS DE DEMONSTRAÇÃO ---
+// --- CONFIGURAÇÃO DA NUVEM E DADOS INICIAIS ---
+const API_URL = 'https://pascale-juris-app.onrender.com/api'; 
 
 const TENANT_CONFIG = {
   name: "Lopes & Associados",
@@ -61,28 +62,6 @@ const DEFAULT_CASES = [
       { id: 4, title: "Audiência", date: "Pendente", completed: false, desc: "Reunião para ouvir testemunhas." },
       { id: 5, title: "Sentença", date: "Pendente", completed: false, desc: "Decisão final do juiz." }
     ]
-  },
-  {
-    id: 2,
-    client: "Mariana Souza",
-    title: "Divórcio Consensual",
-    status: "A Finalizar",
-    stage: "sentenca",
-    anxietyScore: 10,
-    lastUpdate: "Há 1 hora",
-    nextStep: "Averbação",
-    timeline: []
-  },
-  {
-    id: 3,
-    client: "Tech Solutions LTDA",
-    title: "Recuperação Fiscal",
-    status: "Inicial",
-    stage: "peticao",
-    anxietyScore: 40,
-    lastUpdate: "Há 5 dias",
-    nextStep: "Protocolo",
-    timeline: []
   }
 ];
 
@@ -106,7 +85,7 @@ const DEFAULT_FINANCIALS = [
   { id: 4, title: "Honorários Finais", client: "Mariana Souza", amount: 1200.00, dueDate: "15/02/2024", status: "Aberto", type: "Cartão" },
 ];
 
-// --- HOOKS DE PERSISTÊNCIA ---
+// --- HOOKS DE PERSISTÊNCIA (Apenas para módulos não integrados à API ainda) ---
 
 const useStickyState = (defaultValue, key) => {
   const [value, setValue] = useState(() => {
@@ -380,7 +359,15 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     }, 1500);
   };
 
-  const myFinancials = financials.filter(f => f.client === "Carlos Silva");
+  const myFinancials = financials.filter(f => f.client === "Carlos Silva" || f.client === caseData?.client);
+
+  if (!caseData) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
+      <Activity className="w-12 h-12 mb-4 text-slate-300 animate-spin" />
+      <p>Aguardando dados da nuvem...</p>
+      <button onClick={() => onNavigate('landing')} className="mt-4 text-indigo-600 font-bold hover:underline">Voltar</button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20 overflow-x-hidden">
@@ -468,8 +455,10 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
            <div className="relative"><Bell className="w-5 h-5 opacity-70" /><div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900"></div></div>
         </div>
         <div className="flex flex-col items-center">
-           <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold mb-4 shadow-xl ring-2 ring-white/10">CS</div>
-           <h1 className="text-2xl font-bold tracking-tight">Olá, Carlos Silva</h1>
+           <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold mb-4 shadow-xl ring-2 ring-white/10">
+             {caseData.client ? caseData.client.substring(0,2).toUpperCase() : 'CS'}
+           </div>
+           <h1 className="text-2xl font-bold tracking-tight">Olá, {caseData.client}</h1>
            <p className="opacity-70 text-sm mt-1 font-medium">Seu processo está estável e monitorado.</p>
         </div>
       </div>
@@ -495,15 +484,15 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
           <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-sm"><Clock className="w-4 h-4 text-indigo-600" /> Histórico de Etapas</h3>
           <div className="space-y-8 relative">
             <div className="absolute left-[11px] top-2 bottom-4 w-[2px] bg-slate-100"></div>
-            {caseData.timeline.map((step) => (
+            {caseData.timeline && caseData.timeline.map((step) => (
               <div key={step.id} className="relative z-10 flex gap-4">
-                <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center bg-white transition-all duration-500 ${step.completed ? 'border-green-500 text-green-500 bg-green-50/50' : step.current ? 'border-indigo-600 text-indigo-600 ring-4 ring-indigo-50' : 'border-slate-200'}`}>
-                  {step.completed ? <CheckCircle className="w-3 h-3 fill-current" /> : step.current ? <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div> : null}
+                <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center bg-white transition-all duration-500 ${step.completed ? 'border-green-500 text-green-500 bg-green-50/50' : step.current || step.isCurrent ? 'border-indigo-600 text-indigo-600 ring-4 ring-indigo-50' : 'border-slate-200'}`}>
+                  {step.completed ? <CheckCircle className="w-3 h-3 fill-current" /> : step.current || step.isCurrent ? <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div> : null}
                 </div>
-                <div className={`${step.current ? 'opacity-100' : 'opacity-60'}`}>
+                <div className={`${step.current || step.isCurrent ? 'opacity-100' : 'opacity-60'}`}>
                   <h4 className="font-bold text-slate-800 text-sm tracking-tight">{step.title}</h4>
                   <span className="text-[10px] text-slate-400 font-bold block mb-1">{step.date}</span>
-                  <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.desc}</p>
+                  <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.description || step.desc}</p>
                 </div>
               </div>
             ))}
@@ -537,7 +526,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
 
   const handleMove = (id) => {
     onMoveCase(id);
-    setNotification({ title: "Sucesso", message: "Processo movido. Notificação WhatsApp enviada ao cliente.", type: "success" });
+    setNotification({ title: "Sucesso", message: "Processo movido. Base de dados atualizada!", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -548,19 +537,12 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
   };
 
   const handleAttendLead = (lead) => {
-    // 1. Atualiza o status no painel de Novo para Contatado
     if (lead.status === 'Novo') {
       onUpdateLead(lead.id, 'Contatado');
     }
-    
-    // 2. Limpa o telefone para o formato do WhatsApp (só números) e adiciona o 55 (Brasil)
     const phoneDigits = lead.phone.replace(/\D/g, '');
-    
-    // 3. Monta a mensagem mágica de primeiro contato
     const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como o Dr. Marcos pode te ajudar hoje?`;
     const encodedMessage = encodeURIComponent(message);
-    
-    // 4. Abre o WhatsApp com tudo pronto
     window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
     
     setNotification({ title: "Atendimento Iniciado", message: `Abrindo WhatsApp para ${lead.name}...`, type: "success" });
@@ -796,19 +778,93 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
 export default function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   
-  const [cases, setCases] = useStickyState(DEFAULT_CASES, 'pascale_cases');
-  const [leads, setLeads] = useStickyState(DEFAULT_LEADS, 'pascale_leads');
+  // Casos (agora vêm do PostgreSQL / Backend Real)
+  const [cases, setCases] = useState([]);
+  
+  // Leads (também conectados à API para POST)
+  const [leads, setLeads] = useState(DEFAULT_LEADS);
+  
+  // Módulos ainda em demonstração
   const [messages, setMessages] = useStickyState(DEFAULT_MESSAGES, 'pascale_messages');
   const [documents, setDocuments] = useStickyState(DEFAULT_DOCUMENTS, 'pascale_documents');
   const [financials, setFinancials] = useStickyState(DEFAULT_FINANCIALS, 'pascale_financials');
   const [globalNotifications, setGlobalNotifications] = useState([]);
 
-  const moveCase = (caseId) => {
+  // 📡 1. BUSCAR DADOS (Substitui localStorage)
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        console.log("📡 Conectando à base de dados na Nuvem...");
+        const response = await fetch(`${API_URL}/cases`);
+        
+        if (!response.ok) throw new Error('Erro no servidor');
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+           // Formata o dado do banco para encaixar perfeitamente no visual do site
+           const formattedCases = data.map(dbCase => ({
+             ...dbCase,
+             client: dbCase.client ? dbCase.client.name : 'Cliente Desconhecido',
+             lastUpdate: "Sincronizado na Nuvem",
+             nextStep: "Aguardando ação",
+             timeline: dbCase.timeline || []
+           }));
+           setCases(formattedCases);
+        } else {
+           setCases(DEFAULT_CASES); // Se o banco estiver vazio, mostra a demo
+        }
+      } catch (error) {
+        console.warn("⚠️ Servidor API inacessível. Ativando MODO DEMO offline.");
+        setCases(DEFAULT_CASES);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchCases();
+  }, []);
+
+  // 📡 2. GRAVAR DADOS REAIS (Atualizar processo)
+  const moveCase = async (caseId) => {
+    // 1. Atualização Otimista (Muda na tela imediatamente sem esperar a internet)
     setCases(prev => prev.map(c => c.id === caseId ? { ...c, stage: 'sentenca', status: 'Concluído', lastUpdate: 'Agora mesmo' } : c));
+    
+    // 2. Envia para o Banco de Dados Real
+    try {
+      const response = await fetch(`${API_URL}/cases/${caseId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: 'sentenca', status: 'Concluído' })
+      });
+      
+      if (!response.ok) throw new Error('Falha ao gravar no PostgreSQL');
+      console.log("✅ Mudança salva permanentemente na nuvem!");
+    } catch (e) {
+      console.error("Erro ao gravar mudança:", e);
+      // Aqui poderíamos reverter a mudança se a internet falhasse
+    }
   };
 
-  const addLead = (newLead) => setLeads(prev => [newLead, ...prev]);
+  // 📡 3. ENVIAR LEAD REAL PARA O BANCO
+  const addLead = async (newLead) => {
+    setLeads(prev => [newLead, ...prev]); // Mostra no painel na hora
+    
+    try {
+      await fetch(`${API_URL}/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: newLead.name, 
+          phone: newLead.phone, 
+          type: newLead.type 
+        })
+      });
+      console.log("✅ Novo contato enviado para o Servidor");
+    } catch (e) {
+      console.error("Erro ao enviar Lead para API", e);
+    }
+  };
 
   const updateLeadStatus = (id, newStatus) => {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
@@ -839,6 +895,16 @@ export default function App() {
       default: return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} />;
     }
   };
+
+  // Efeito de Tela de Carregamento Inicial do Banco de Dados
+  if (loadingData) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
+        <Activity className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
+        <p className="font-extrabold tracking-widest uppercase text-xs animate-pulse text-indigo-200">Sincronizando Banco de Dados...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900 pb-20 md:pb-0">
