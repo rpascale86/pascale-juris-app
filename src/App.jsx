@@ -38,17 +38,18 @@ import {
 const API_URL = 'https://pascale-juris-app.onrender.com/api'; 
 
 const TENANT_CONFIG = {
-  name: "Lopes & Associados",
-  primaryColor: "bg-indigo-900",
-  secondaryColor: "text-indigo-900",
-  logoText: "LOPES JURIS",
-  whatsapp: "(11) 99999-9999"
+  name: "Renzo Advogados",
+  primaryColor: "bg-slate-900",
+  secondaryColor: "text-slate-900",
+  logoText: "RENZO JURIS",
+  advogado: "Dr. Renzo"
 };
 
 const DEFAULT_CASES = [
   {
     id: 1,
     client: "Carlos Silva",
+    phone: "11999999999",
     title: "Ação de Indenização vs Banco X",
     status: "Em Andamento",
     stage: "analise_juiz",
@@ -62,6 +63,30 @@ const DEFAULT_CASES = [
       { id: 4, title: "Audiência", date: "Pendente", completed: false, desc: "Reunião para ouvir testemunhas." },
       { id: 5, title: "Sentença", date: "Pendente", completed: false, desc: "Decisão final do juiz." }
     ]
+  },
+  {
+    id: 2,
+    client: "Mariana Souza",
+    phone: "11988888888",
+    title: "Divórcio Consensual",
+    status: "A Finalizar",
+    stage: "sentenca",
+    anxietyScore: 10,
+    lastUpdate: "Há 1 hora",
+    nextStep: "Averbação",
+    timeline: []
+  },
+  {
+    id: 3,
+    client: "Tech Solutions LTDA",
+    phone: "11977777777",
+    title: "Recuperação Fiscal",
+    status: "Inicial",
+    stage: "peticao",
+    anxietyScore: 40,
+    lastUpdate: "Há 5 dias",
+    nextStep: "Protocolo",
+    timeline: []
   }
 ];
 
@@ -85,7 +110,7 @@ const DEFAULT_FINANCIALS = [
   { id: 4, title: "Honorários Finais", client: "Mariana Souza", amount: 1200.00, dueDate: "15/02/2024", status: "Aberto", type: "Cartão" },
 ];
 
-// --- HOOKS DE PERSISTÊNCIA (Apenas para módulos não integrados à API ainda) ---
+// --- HOOKS DE PERSISTÊNCIA ---
 
 const useStickyState = (defaultValue, key) => {
   const [value, setValue] = useState(() => {
@@ -139,12 +164,12 @@ const LoginPage = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-        <div className="bg-indigo-900 p-8 text-center">
-          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 text-white">
+        <div className="bg-slate-800 p-8 text-center border-b-4 border-indigo-500">
+          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-inner">
             <Gavel className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white">{TENANT_CONFIG.logoText}</h1>
-          <p className="text-indigo-200 text-sm">Acesso Restrito ao Corpo Jurídico</p>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">{TENANT_CONFIG.logoText}</h1>
+          <p className="text-slate-300 text-xs font-bold uppercase tracking-widest mt-2">Acesso Restrito</p>
         </div>
         <div className="p-8">
           <form onSubmit={handleLogin} className="space-y-4">
@@ -156,7 +181,7 @@ const LoginPage = ({ onLogin }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
-                placeholder="advogado@lopes.com.br"
+                placeholder="renzo@advocacia.com.br"
               />
             </div>
             <div>
@@ -187,48 +212,31 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-// 1. LANDING PAGE (Site Público)
+// 1. LANDING PAGE (Site Público - Preservado mas oculto no momento)
 const LandingPage = ({ onNavigate, onAddLead }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '', type: 'Usucapião' });
   const [showNotification, setShowNotification] = useState(false);
 
-  // Formata o telefone automaticamente (XX) XXXXX-XXXX
   const handlePhoneChange = (e) => {
     let value = e.target.value.replace(/\D/g, ''); 
     if (value.length > 11) value = value.slice(0, 11); 
-    
     let formatted = value;
-    if (value.length > 2) {
-      formatted = `(${value.slice(0, 2)}) ${value.slice(2)}`;
-    }
-    if (value.length > 7) {
-      formatted = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
-    }
-    
+    if (value.length > 2) formatted = `(${value.slice(0, 2)}) ${value.slice(2)}`;
+    if (value.length > 7) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
     setFormData({ ...formData, phone: formatted });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
     const rawPhone = formData.phone.replace(/\D/g, '');
     if (rawPhone.length < 10) {
       alert("Por favor, digite um número de celular válido com o DDD.");
       return;
     }
-
-    onAddLead({
-      id: Date.now(),
-      name: formData.name,
-      phone: formData.phone,
-      type: formData.type,
-      status: "Novo",
-      date: "Agora mesmo"
-    });
+    onAddLead({ id: Date.now(), name: formData.name, phone: formData.phone, type: formData.type, status: "Novo", date: "Agora mesmo" });
     setFormData({ name: '', phone: '', type: 'Usucapião' });
     setIsModalOpen(false);
-    
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 4000);
   };
@@ -317,7 +325,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
   );
 };
 
-// 2. PORTAL DO CLIENTE
+// 2. PORTAL DO CLIENTE (Preservado mas oculto no momento)
 const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials }) => {
   const [chatOpen, setChatOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -341,7 +349,6 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
       setUploadOpen(false);
       onUploadDocument("Documento_Carlos_Silva.pdf");
       onNotifyLawyer("Novo Documento Recebido de Carlos Silva.");
-      
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
     }, 2000);
@@ -427,8 +434,10 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
         <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-up md:max-w-md md:right-4 md:left-auto md:bottom-4 md:top-auto md:h-[600px] md:shadow-2xl md:rounded-2xl border-slate-200">
           <div className="bg-indigo-900 text-white p-4 flex justify-between items-center md:rounded-t-2xl">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">ML</div>
-              <div><div className="font-bold text-sm leading-none mb-1">Dr. Marcos Lopes</div><div className="text-[10px] opacity-70 flex items-center gap-1"><div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div> Disponível agora</div></div>
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">
+                {TENANT_CONFIG.advogado.substring(4, 6).toUpperCase()}
+              </div>
+              <div><div className="font-bold text-sm leading-none mb-1">{TENANT_CONFIG.advogado}</div><div className="text-[10px] opacity-70 flex items-center gap-1"><div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div> Disponível agora</div></div>
             </div>
             <button onClick={() => setChatOpen(false)} className="p-1"><X className="w-6 h-6" /></button>
           </div>
@@ -438,7 +447,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
                 <div className={`p-3 rounded-2xl text-sm max-w-[85%] shadow-sm ${msg.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none'}`}>{msg.text}</div>
               </div>
             ))}
-            {isTyping && <div className="text-[10px] text-slate-400 italic">Dr. Marcos está digitando...</div>}
+            {isTyping && <div className="text-[10px] text-slate-400 italic">{TENANT_CONFIG.advogado} está digitando...</div>}
             <div ref={chatEndRef} />
           </div>
           <div className="p-4 bg-white border-t flex gap-2 md:rounded-b-2xl">
@@ -450,6 +459,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 
       <div className={`${TENANT_CONFIG.primaryColor} text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg`}>
         <div className="flex justify-between items-center mb-8">
+           {/* Botão de voltar ao site (inativo no modo focado em gestão, mas preservado) */}
            <button onClick={() => onNavigate('landing')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ArrowRight className="w-5 h-5 rotate-180" /></button>
            <span className="font-bold text-[10px] uppercase tracking-[0.2em] opacity-70">Painel do Cliente</span>
            <div className="relative"><Bell className="w-5 h-5 opacity-70" /><div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900"></div></div>
@@ -500,7 +510,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => setChatOpen(true)} className="p-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 flex flex-col items-center gap-2 text-xs transition active:scale-95"><MessageSquare className="w-5 h-5" /> Falar com Dr. Marcos</button>
+          <button onClick={() => setChatOpen(true)} className="p-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 flex flex-col items-center gap-2 text-xs transition active:scale-95"><MessageSquare className="w-5 h-5" /> Falar com {TENANT_CONFIG.advogado}</button>
           <button onClick={() => setFinancialOpen(true)} className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 text-xs hover:border-indigo-500 transition active:scale-95"><DollarSign className="w-5 h-5 text-green-600" /> Ver Pagamentos</button>
         </div>
         <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5 text-indigo-500" /> Enviar Arquivo Digital</button>
@@ -510,13 +520,17 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 };
 
 // 3. PAINEL DO ADVOGADO
-const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, financials, onUpdateFinancial, globalNotifications, onLogout, onUpdateLead }) => {
+const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, globalNotifications, onLogout, onUpdateLead }) => {
   const [activeTab, setActiveTab] = useState('kanban');
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Estado do Modal de Novo Processo
+  const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
+  const [newCaseData, setNewCaseData] = useState({ client: '', phone: '', title: '' });
 
   useEffect(() => {
-    if (globalNotifications.length > 0) {
+    if (globalNotifications && globalNotifications.length > 0) {
       const latest = globalNotifications[globalNotifications.length - 1];
       setNotification({ title: "Nova Atividade", message: latest, type: "info" });
       const timer = setTimeout(() => setNotification(null), 5000);
@@ -541,12 +555,19 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
       onUpdateLead(lead.id, 'Contatado');
     }
     const phoneDigits = lead.phone.replace(/\D/g, '');
-    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como o Dr. Marcos pode te ajudar hoje?`;
+    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como o ${TENANT_CONFIG.advogado} pode te ajudar hoje?`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
     
     setNotification({ title: "Atendimento Iniciado", message: `Abrindo WhatsApp para ${lead.name}...`, type: "success" });
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleAttendWhatsApp = (phone, name) => {
+    const phoneDigits = phone.replace(/\D/g, '');
+    const message = `Olá, ${name}! Aqui é do escritório ${TENANT_CONFIG.name}. Tudo bem? Estou entrando em contato sobre o seu processo.`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
   };
 
   const handleAnxietyClick = (clientName) => {
@@ -558,10 +579,21 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
     setTimeout(() => setNotification(null), 7000);
   };
 
+  const handleAddNewCase = (e) => {
+    e.preventDefault();
+    onAddCase(newCaseData);
+    setIsAddCaseModalOpen(false);
+    setNewCaseData({ client: '', phone: '', title: '' });
+    setNotification({ title: "Processo Cadastrado", message: "O novo cliente foi adicionado à carteira.", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
+      
+      {/* Notificações Flutuantes */}
       {notification && (
-        <div className={`fixed top-6 right-6 z-[100] px-6 py-4 rounded-xl shadow-2xl flex items-start gap-4 animate-slide-in border 
+        <div className={`fixed top-6 right-6 z-[300] px-6 py-4 rounded-xl shadow-2xl flex items-start gap-4 animate-slide-in border 
             ${notification.type === 'warning' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-slate-900 border-white/10 text-white'}`}>
           <div className={`${notification.type === 'success' ? 'bg-green-500' : notification.type === 'warning' ? 'bg-red-500' : 'bg-blue-500'} rounded-full p-2 mt-0.5`}>
             {notification.type === 'success' ? <CheckCircle className="w-4 h-4 text-white" /> : notification.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-white" /> : <Bell className="w-4 h-4 text-white" />}
@@ -576,6 +608,28 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
         </div>
       )}
 
+      {/* Modal Novo Processo */}
+      <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Cadastrar Novo Processo">
+        <form onSubmit={handleAddNewCase} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
+            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: João da Silva" value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp (Celular)</label>
+            <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Ação</label>
+            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Usucapião Imóvel X" value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} />
+          </div>
+          <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
+            Salvar e Adicionar ao Painel
+          </button>
+        </form>
+      </Modal>
+
+      {/* Menu Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-[60] md:hidden backdrop-blur-sm transition-opacity"
@@ -587,7 +641,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
         <div className="p-6 md:p-8 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-900/50"><Gavel className="w-5 h-5 text-white" /></div>
-            <span className="font-extrabold text-white tracking-tighter text-lg">PASCALE JURIS</span>
+            <span className="font-extrabold text-white tracking-tighter text-lg">{TENANT_CONFIG.logoText}</span>
           </div>
           <button className="md:hidden text-white/50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
             <X className="w-5 h-5" />
@@ -595,7 +649,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
         </div>
         <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
           <button onClick={() => { setActiveTab('kanban'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'kanban' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/20 translate-x-1' : 'hover:bg-slate-800'}`}><Activity className="w-5 h-5" /> <span className="text-sm font-bold">Painel de Gestão</span></button>
-          <button onClick={() => { setActiveTab('leads'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'leads' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><Users className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Novos Leads</span> {leads.length > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white">{leads.length}</span>}</button>
+          <button onClick={() => { setActiveTab('leads'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'leads' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><Users className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Novos Leads</span> {leads && leads.length > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white">{leads.length}</span>}</button>
           <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Documentação</span></button>
           <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controle Financeiro</span></button>
         </nav>
@@ -609,11 +663,23 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
              <h1 className="font-extrabold text-xl md:text-2xl text-slate-800 tracking-tight capitalize">{activeTab.replace('_', ' ')}</h1>
           </div>
           <div className="flex items-center gap-4 md:gap-6">
-            <div className="hidden md:flex flex-col text-right">
-              <span className="text-sm font-extrabold text-slate-800">Dr. Marcos Lopes</span>
+            
+            {/* BOTÃO MÁGICO DE NOVO PROCESSO FICA AQUI */}
+            <button 
+              onClick={() => setIsAddCaseModalOpen(true)}
+              className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Novo Processo</span>
+            </button>
+
+            <div className="hidden md:flex flex-col text-right border-l pl-6 border-slate-200">
+              <span className="text-sm font-extrabold text-slate-800">{TENANT_CONFIG.advogado}</span>
               <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">Advogado Senior</span>
             </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-700 font-extrabold text-lg border-2 border-indigo-50 shadow-sm">ML</div>
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg border-2 border-slate-800 shadow-sm">
+              {TENANT_CONFIG.advogado.substring(4, 6).toUpperCase()}
+            </div>
           </div>
         </header>
 
@@ -631,7 +697,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                        <tr><th className="p-4 md:p-8">Descrição da Fatura</th><th className="p-4 md:p-8">Cliente</th><th className="p-4 md:p-8">Vencimento</th><th className="p-4 md:p-8">Montante</th><th className="p-4 md:p-8">Estado</th><th className="p-4 md:p-8 text-right">Ações</th></tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100">
-                       {financials.map(fin => (
+                       {financials && financials.map(fin => (
                          <tr key={fin.id} className="hover:bg-slate-50/50 transition duration-300">
                            <td className="p-4 md:p-8 font-bold text-slate-800">{fin.title}</td>
                            <td className="p-4 md:p-8 text-slate-600 font-medium">{fin.client}</td>
@@ -652,7 +718,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                      <tr><th className="p-4 md:p-8">Interessado</th><th className="p-4 md:p-8">Contato</th><th className="p-4 md:p-8">Área</th><th className="p-4 md:p-8">Data Entrada</th><th className="p-4 md:p-8">Status</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
-                     {leads.map(lead => (
+                     {leads && leads.map(lead => (
                        <tr key={lead.id} className="hover:bg-slate-50/50 transition duration-300">
                          <td className="p-4 md:p-8 font-bold text-slate-800">{lead.name}</td>
                          <td className="p-4 md:p-8 text-slate-600 font-medium">{lead.phone}</td>
@@ -680,7 +746,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                      <tr><th className="p-4 md:p-8">Arquivo Digital</th><th className="p-4 md:p-8">Remetente</th><th className="p-4 md:p-8">Data</th><th className="p-4 md:p-8">Tamanho</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
-                     {documents.map(doc => (
+                     {documents && documents.map(doc => (
                        <tr key={doc.id} className="hover:bg-slate-50/50 transition duration-300">
                          <td className="p-4 md:p-8 font-bold text-slate-800 flex items-center gap-3 md:gap-4"><div className="p-2 bg-indigo-50 rounded-lg"><File className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" /></div> {doc.name}</td>
                          <td className="p-4 md:p-8 text-slate-600 font-medium">{doc.client}</td>
@@ -712,13 +778,13 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                    <div className="text-3xl md:text-5xl font-extrabold text-red-600 tracking-tighter">{cases.filter(c => c.anxietyScore > 70).length}</div>
                 </div>
                 
-                {/* 3. O Bloco de Conversões Pendentes (Já funcionava) */}
+                {/* 3. O Bloco de Conversões Pendentes */}
                 <div onClick={() => setActiveTab('leads')} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
                    <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-green-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-green-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
                      Conversões Pendentes <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                    </div>
-                   <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads.filter(l => l.status === 'Novo').length}</div>
+                   <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads && leads.filter(l => l.status === 'Novo').length}</div>
                 </div>
 
                 {/* 4. O Bloco de Eficiência */}
@@ -730,14 +796,22 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
 
               </div>
 
+              {/* KANBAN BOARD */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
-                {['peticao', 'analise_juiz', 'sentenca'].map(stage => (
-                  <div key={stage} className="bg-slate-200/40 rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-8 border border-slate-200/50 min-h-[400px] md:min-h-[550px] flex flex-col gap-4 md:gap-6 backdrop-blur-sm">
+                {[
+                  { id: 'peticao', title: 'Fase Inicial (Petição)', color: 'border-slate-300' },
+                  { id: 'analise_juiz', title: 'Em Andamento (Juiz)', color: 'border-indigo-400' },
+                  { id: 'sentenca', title: 'Concluído (Sentença)', color: 'border-green-400' }
+                ].map(col => (
+                  <div key={col.id} className="bg-slate-200/40 rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-8 border border-slate-200/50 min-h-[400px] md:min-h-[550px] flex flex-col gap-4 md:gap-6 backdrop-blur-sm">
                     <div className="flex justify-between items-center px-2 md:px-4 mb-2">
-                       <span className="font-extrabold text-slate-500 text-[10px] md:text-[11px] uppercase tracking-[0.1em]">{stage.replace('_', ' ')}</span>
-                       <span className="bg-white text-slate-800 font-extrabold text-[10px] px-3 py-1 rounded-full shadow-sm border border-slate-200">{cases.filter(c => c.stage === stage).length}</span>
+                       <span className="font-extrabold text-slate-500 text-[10px] md:text-[11px] uppercase tracking-[0.1em] flex items-center gap-2">
+                         <div className={`w-2 h-2 rounded-full border-2 ${col.color} bg-white`}></div>
+                         {col.title}
+                       </span>
+                       <span className="bg-white text-slate-800 font-extrabold text-[10px] px-3 py-1 rounded-full shadow-sm border border-slate-200">{cases.filter(c => c.stage === col.id).length}</span>
                     </div>
-                    {cases.filter(c => c.stage === stage).map(c => (
+                    {cases.filter(c => c.stage === col.id).map(c => (
                       <div key={c.id} className={`bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-[6px] transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 md:hover:-translate-y-2 group relative overflow-hidden ${c.anxietyScore > 70 ? 'border-l-red-500' : 'border-l-indigo-600'}`}>
                          <div className="flex justify-between items-start mb-4">
                            <span className="text-[8px] md:text-[9px] font-extrabold uppercase bg-slate-50 text-slate-500 px-3 py-1 rounded-full tracking-tighter">{c.status}</span>
@@ -756,12 +830,31 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                          
                          <h3 className="font-extrabold text-slate-800 text-base md:text-lg mb-1 leading-tight tracking-tight group-hover:text-indigo-600 transition">{c.client}</h3>
                          <p className="text-[10px] md:text-[11px] text-slate-400 font-semibold mb-5 md:mb-6 truncate">{c.title}</p>
-                         <div className="flex justify-between items-center pt-4 md:pt-5 border-t border-slate-50">
-                            <span className="text-[8px] md:text-[9px] text-slate-300 font-extrabold uppercase tracking-widest">{c.lastUpdate}</span>
-                            <button onClick={() => handleMove(c.id)} className="text-[9px] md:text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 md:px-4 py-2 rounded-xl opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 transform md:translate-x-4 md:group-hover:translate-x-0 shadow-sm">Avançar ➔</button>
+                         
+                         <div className="flex justify-between items-center pt-4 md:pt-5 border-t border-slate-50 gap-2">
+                            {/* Botão de WhatsApp */}
+                            <button 
+                              onClick={() => handleAttendWhatsApp(c.phone || "11999999999", c.client)}
+                              className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold text-green-600 bg-green-50 px-3 py-2 rounded-lg hover:bg-green-100 transition whitespace-nowrap"
+                            >
+                              <MessageSquare className="w-3 h-3" /> WhatsApp
+                            </button>
+
+                            {/* Botão Avançar Fase (somente se não for a última coluna) */}
+                            {col.id !== 'sentenca' && (
+                              <button onClick={() => handleMove(c.id)} className="text-[9px] md:text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 md:px-4 py-2 rounded-xl transition-all duration-300 shadow-sm hover:bg-indigo-100">
+                                Avançar ➔
+                              </button>
+                            )}
                          </div>
                       </div>
                     ))}
+                    
+                    {cases.filter(c => c.stage === col.id).length === 0 && (
+                      <div className="h-24 border-2 border-dashed border-slate-300/50 rounded-2xl flex items-center justify-center text-slate-400 text-xs font-bold">
+                        Nenhum processo nesta fase
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -776,23 +869,21 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
 // --- APP CONTROLLER ---
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('landing');
+  // ABRIR DIRETO NO LOGIN PARA FOCAR NA GESTÃO!
+  const [currentView, setCurrentView] = useState('login'); 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   
-  // Casos (agora vêm do PostgreSQL / Backend Real)
   const [cases, setCases] = useState([]);
   
-  // Leads (também conectados à API para POST)
-  const [leads, setLeads] = useState(DEFAULT_LEADS);
-  
-  // Módulos ainda em demonstração
+  // Módulos que continuarão preservados
+  const [leads, setLeads] = useStickyState(DEFAULT_LEADS, 'pascale_leads');
   const [messages, setMessages] = useStickyState(DEFAULT_MESSAGES, 'pascale_messages');
   const [documents, setDocuments] = useStickyState(DEFAULT_DOCUMENTS, 'pascale_documents');
   const [financials, setFinancials] = useStickyState(DEFAULT_FINANCIALS, 'pascale_financials');
   const [globalNotifications, setGlobalNotifications] = useState([]);
 
-  // 📡 1. BUSCAR DADOS (Substitui localStorage)
+  // 📡 1. BUSCAR DADOS
   useEffect(() => {
     const fetchCases = async () => {
       try {
@@ -803,17 +894,17 @@ export default function App() {
         const data = await response.json();
         
         if (data && data.length > 0) {
-           // Formata o dado do banco para encaixar perfeitamente no visual do site
            const formattedCases = data.map(dbCase => ({
              ...dbCase,
              client: dbCase.client ? dbCase.client.name : 'Cliente Desconhecido',
+             phone: dbCase.client ? dbCase.client.phone : '',
              lastUpdate: "Sincronizado na Nuvem",
              nextStep: "Aguardando ação",
              timeline: dbCase.timeline || []
            }));
            setCases(formattedCases);
         } else {
-           setCases(DEFAULT_CASES); // Se o banco estiver vazio, mostra a demo
+           setCases(DEFAULT_CASES);
         }
       } catch (error) {
         console.warn("⚠️ Servidor API inacessível. Ativando MODO DEMO offline.");
@@ -825,79 +916,77 @@ export default function App() {
     fetchCases();
   }, []);
 
-  // 📡 2. GRAVAR DADOS REAIS (Atualizar processo)
+  // 📡 2. GRAVAR DADOS REAIS E MOVER FASE
   const moveCase = async (caseId) => {
-    // 1. Atualização Otimista (Muda na tela imediatamente sem esperar a internet)
-    setCases(prev => prev.map(c => c.id === caseId ? { ...c, stage: 'sentenca', status: 'Concluído', lastUpdate: 'Agora mesmo' } : c));
+    setCases(prev => prev.map(c => {
+      if (c.id === caseId) {
+        const newStage = c.stage === 'peticao' ? 'analise_juiz' : 'sentenca';
+        return { ...c, stage: newStage, status: newStage === 'sentenca' ? 'Concluído' : 'Em Andamento', lastUpdate: 'Agora mesmo' };
+      }
+      return c;
+    }));
     
-    // 2. Envia para o Banco de Dados Real
     try {
-      const response = await fetch(`${API_URL}/cases/${caseId}/move`, {
+      await fetch(`${API_URL}/cases/${caseId}/move`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stage: 'sentenca', status: 'Concluído' })
       });
-      
-      if (!response.ok) throw new Error('Falha ao gravar no PostgreSQL');
       console.log("✅ Mudança salva permanentemente na nuvem!");
     } catch (e) {
       console.error("Erro ao gravar mudança:", e);
-      // Aqui poderíamos reverter a mudança se a internet falhasse
     }
   };
 
-  // 📡 3. ENVIAR LEAD REAL PARA O BANCO
-  const addLead = async (newLead) => {
-    setLeads(prev => [newLead, ...prev]); // Mostra no painel na hora
+  // ➕ 3. NOVO PROCESSO
+  const addCase = (newCaseData) => {
+    const novoProcesso = {
+      id: Date.now(), 
+      client: newCaseData.client,
+      phone: newCaseData.phone,
+      title: newCaseData.title,
+      status: "Novo",
+      stage: "peticao", 
+      anxietyScore: 0,
+      lastUpdate: "Agora mesmo",
+      timeline: []
+    };
     
+    setCases(prev => [novoProcesso, ...prev]);
+  };
+
+  const addLead = async (newLead) => {
+    setLeads(prev => [newLead, ...prev]); 
     try {
       await fetch(`${API_URL}/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name: newLead.name, 
-          phone: newLead.phone, 
-          type: newLead.type 
-        })
+        body: JSON.stringify({ name: newLead.name, phone: newLead.phone, type: newLead.type })
       });
-      console.log("✅ Novo contato enviado para o Servidor");
-    } catch (e) {
-      console.error("Erro ao enviar Lead para API", e);
-    }
+    } catch (e) { console.error("Erro ao enviar Lead", e); }
   };
 
-  const updateLeadStatus = (id, newStatus) => {
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
-  };
-
-  const handleSendMessage = (text, sender) => {
-    setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
-  };
-
-  const handleUploadDocument = (filename) => {
-    setDocuments(prev => [{ id: Date.now(), name: filename, client: "Carlos Silva", date: "Hoje", size: "2.4 MB" }, ...prev]);
-  };
-
-  const updateFinancial = (id, newStatus) => {
-    setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
-  };
-
+  const updateLeadStatus = (id, newStatus) => setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+  const handleSendMessage = (text, sender) => setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
+  const handleUploadDocument = (filename) => setDocuments(prev => [{ id: Date.now(), name: filename, client: "Carlos Silva", date: "Hoje", size: "2.4 MB" }, ...prev]);
+  const updateFinancial = (id, newStatus) => setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
   const notifyLawyer = (message) => setGlobalNotifications(prev => [...prev, message]);
 
+  // ROTAS INTERNAS
   const renderView = () => {
     switch(currentView) {
       case 'landing': return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} />;
-      case 'login': return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
       case 'portal': return <ClientPortal onNavigate={setCurrentView} caseData={cases[0]} onNotifyLawyer={notifyLawyer} messages={messages} onSendMessage={handleSendMessage} onUploadDocument={handleUploadDocument} financials={financials} />;
+      case 'login': return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
       case 'dashboard': 
         if (!isAuthenticated) return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
-        return <LawyerDashboard onNavigate={setCurrentView} cases={cases} onMoveCase={moveCase} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} globalNotifications={globalNotifications} onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} onUpdateLead={updateLeadStatus} />;
-      default: return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} />;
+        return <LawyerDashboard onNavigate={setCurrentView} cases={cases} onMoveCase={moveCase} onAddCase={addCase} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} globalNotifications={globalNotifications} onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} onUpdateLead={updateLeadStatus} />;
+      default: return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
     }
   };
 
-  // Efeito de Tela de Carregamento Inicial do Banco de Dados
-  if (loadingData) {
+  // TELA DE CARREGAMENTO DO BANCO DE DADOS
+  if (loadingData && isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
         <Activity className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
@@ -920,12 +1009,20 @@ export default function App() {
         * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
       `}</style>
       
-      <div className="fixed bottom-3 md:bottom-6 left-3 md:left-6 right-3 md:right-auto z-[200] bg-slate-950/90 backdrop-blur-2xl text-white px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[2rem] shadow-2xl flex justify-center md:justify-start gap-2 md:gap-8 text-[9px] md:text-[11px] font-extrabold border border-white/10 items-center ring-1 ring-white/20">
+      {/* ========================================================================
+        CONTROLE MASTER DESABILITADO (COMENTADO)
+        Para reativar a navegação livre entre Site, Portal e Painel no futuro,
+        basta remover os comentários {/* e * /} deste bloco abaixo.
+        ========================================================================
+      */}
+
+      {/* <div className="fixed bottom-3 md:bottom-6 left-3 md:left-6 right-3 md:right-auto z-[200] bg-slate-950/90 backdrop-blur-2xl text-white px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[2rem] shadow-2xl flex justify-center md:justify-start gap-2 md:gap-8 text-[9px] md:text-[11px] font-extrabold border border-white/10 items-center ring-1 ring-white/20">
         <span className="hidden md:inline text-slate-600 uppercase tracking-[0.3em] border-r border-slate-800 pr-8 py-1">Controle Master</span>
         <button onClick={() => setCurrentView('landing')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'landing' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>1. SITE</button>
         <button onClick={() => setCurrentView('portal')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'portal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>2. PORTAL</button>
         <button onClick={() => setCurrentView('dashboard')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'dashboard' || currentView === 'login' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>3. PAINEL</button>
       </div>
+      */}
 
       {renderView()}
     </div>
