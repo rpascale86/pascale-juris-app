@@ -82,7 +82,7 @@ app.patch('/api/cases/:id/move', async (req, res) => {
   }
 });
 
-// CRIAÇÃO DE NOVO PROCESSO E CLIENTE COM DADOS COMPLETOS
+// CRIAÇÃO DE NOVO PROCESSO E CLIENTE COM VALIDAÇÃO ESTRITA DE CPF
 app.post('/api/cases', async (req, res) => {
   const { client, cpf, phone, title } = req.body;
 
@@ -96,14 +96,18 @@ app.post('/api/cases', async (req, res) => {
       return res.status(400).json({ error: 'Nenhum advogado encontrado na base de dados.' });
     }
 
-    // Procura cliente primeiro pelo CPF, depois pelo Nome
-    let dbClient = null;
+    // 🚨 REGRA DE NEGÓCIO: BLOQUEIA SE O CPF JÁ EXISTIR NO SISTEMA
     if (cpf) {
-      dbClient = await prisma.client.findFirst({ where: { cpf } });
+      const cpfExists = await prisma.client.findFirst({ where: { cpf: cpf } });
+      if (cpfExists) {
+        return res.status(400).json({ 
+          error: `Este CPF já está associado ao cliente "${cpfExists.name}". Não é possível duplicar cadastros.` 
+        });
+      }
     }
-    if (!dbClient) {
-      dbClient = await prisma.client.findFirst({ where: { name: client } });
-    }
+
+    // Procura o cliente pelo nome (para o caso de ele não ter digitado CPF)
+    let dbClient = await prisma.client.findFirst({ where: { name: client } });
 
     // Se não existe, cria um novo
     if (!dbClient) {
@@ -117,7 +121,7 @@ app.post('/api/cases', async (req, res) => {
       });
       console.log(`👤 Novo cliente registado: ${client} (CPF: ${cpf})`);
     } else {
-      // Se o cliente existe mas não tinha CPF registado, atualiza
+      // Se o cliente já existia no sistema mas não tinha CPF, atualiza-o
       if (cpf && !dbClient.cpf) {
         await prisma.client.update({
           where: { id: dbClient.id },
