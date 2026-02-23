@@ -63,30 +63,6 @@ const DEFAULT_CASES = [
       { id: 4, title: "Audiência", date: "Pendente", completed: false, desc: "Reunião para ouvir testemunhas." },
       { id: 5, title: "Sentença", date: "Pendente", completed: false, desc: "Decisão final do juiz." }
     ]
-  },
-  {
-    id: 2,
-    client: "Mariana Souza",
-    phone: "11988888888",
-    title: "Divórcio Consensual",
-    status: "A Finalizar",
-    stage: "sentenca",
-    anxietyScore: 10,
-    lastUpdate: "Há 1 hora",
-    nextStep: "Averbação",
-    timeline: []
-  },
-  {
-    id: 3,
-    client: "Tech Solutions LTDA",
-    phone: "11977777777",
-    title: "Recuperação Fiscal",
-    status: "Inicial",
-    stage: "peticao",
-    anxietyScore: 40,
-    lastUpdate: "Há 5 dias",
-    nextStep: "Protocolo",
-    timeline: []
   }
 ];
 
@@ -105,9 +81,7 @@ const DEFAULT_DOCUMENTS = [
 
 const DEFAULT_FINANCIALS = [
   { id: 1, title: "Honorários Iniciais", client: "Carlos Silva", amount: 2500.00, dueDate: "10/01/2024", status: "Pago", type: "Pix" },
-  { id: 2, title: "Parcela 2/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/02/2024", status: "Atrasado", type: "Boleto" },
-  { id: 3, title: "Parcela 3/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/03/2024", status: "Aberto", type: "Boleto" },
-  { id: 4, title: "Honorários Finais", client: "Mariana Souza", amount: 1200.00, dueDate: "15/02/2024", status: "Aberto", type: "Cartão" },
+  { id: 2, title: "Parcela 2/10", client: "Carlos Silva", amount: 500.00, dueDate: "10/02/2024", status: "Atrasado", type: "Boleto" }
 ];
 
 // --- HOOKS DE PERSISTÊNCIA ---
@@ -400,7 +374,6 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
                <div key={fin.id} className="border border-slate-200 rounded-lg p-3 flex justify-between items-center bg-white shadow-sm">
                  <div>
                    <div className="font-bold text-slate-800 text-sm tracking-tight">{fin.title}</div>
-                   {/* DATA FORMATADA AQUI */}
                    <div className="text-[10px] text-slate-400">Vencimento: {formatDate(fin.dueDate)}</div>
                  </div>
                  <div className="text-right">
@@ -539,7 +512,9 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [newFinData, setNewFinData] = useState({ title: '', client: '', amount: '', dueDate: '', type: 'Boleto' });
   const [newDocData, setNewDocData] = useState({ name: '', client: '' });
 
+  // EVITA LETRAS E APLICA MÁSCARA
   const handleNewCasePhoneChange = (e) => {
+    // Pega tudo o que foi digitado, remove letras na hora
     let value = e.target.value.replace(/\D/g, ''); 
     if (value.length > 11) value = value.slice(0, 11); 
     let formatted = value;
@@ -598,14 +573,18 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     setTimeout(() => setNotification(null), 7000);
   };
 
-  // Funções de Submissão
+  // Funções de Submissão - AGORA COM NOTIFICAÇÃO SUAVE EM VEZ DE ALERT()
   const handleAddNewCase = (e) => {
     e.preventDefault();
     const rawPhone = newCaseData.phone.replace(/\D/g, '');
+    
+    // Se o telefone não for válido, exibe notificação amigável e impede o travamento
     if (rawPhone.length < 10) {
-      alert("Por favor, digite um número de celular válido com o DDD.");
-      return;
+      setNotification({ title: "Telefone Inválido", message: "Por favor, digite apenas números, incluindo o DDD.", type: "warning" });
+      setTimeout(() => setNotification(null), 4000);
+      return; 
     }
+    
     onAddCase(newCaseData);
     setIsAddCaseModalOpen(false);
     setNewCaseData({ client: '', phone: '', title: '' });
@@ -659,7 +638,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: João da Silva" value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp (Celular)</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp (Celular apenas números)</label>
             <input 
               required type="tel" minLength={14} maxLength={15} 
               className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" 
@@ -812,7 +791,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <tr key={fin.id} className="hover:bg-slate-50/50 transition duration-300">
                            <td className="p-4 md:p-8 font-bold text-slate-800">{fin.title}</td>
                            <td className="p-4 md:p-8 text-slate-600 font-medium">{fin.client}</td>
-                           {/* DATA FORMATADA AQUI TAMBÉM */}
+                           {/* AQUI APLICAMOS A FUNÇÃO PARA TRADUZIR A DATA */}
                            <td className="p-4 md:p-8 text-slate-500 font-medium">{formatDate(fin.dueDate)}</td>
                            <td className="p-4 md:p-8 font-extrabold text-slate-800">{formatCurrency(fin.amount)}</td>
                            <td className="p-4 md:p-8"><span className={`px-3 md:px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase tracking-tight ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{fin.status}</span></td>
