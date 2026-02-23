@@ -347,7 +347,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     setTimeout(() => {
       setIsUploading(false);
       setUploadOpen(false);
-      onUploadDocument("Documento_Carlos_Silva.pdf");
+      onUploadDocument({ name: "Documento_Carlos_Silva.pdf", client: caseData.client });
       onNotifyLawyer("Novo Documento Recebido de Carlos Silva.");
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
@@ -459,7 +459,6 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 
       <div className={`${TENANT_CONFIG.primaryColor} text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg`}>
         <div className="flex justify-between items-center mb-8">
-           {/* Botão de voltar ao site (inativo no modo focado em gestão, mas preservado) */}
            <button onClick={() => onNavigate('landing')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ArrowRight className="w-5 h-5 rotate-180" /></button>
            <span className="font-bold text-[10px] uppercase tracking-[0.2em] opacity-70">Painel do Cliente</span>
            <div className="relative"><Bell className="w-5 h-5 opacity-70" /><div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900"></div></div>
@@ -520,16 +519,21 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 };
 
 // 3. PAINEL DO ADVOGADO
-const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, globalNotifications, onLogout, onUpdateLead }) => {
+const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead }) => {
   const [activeTab, setActiveTab] = useState('kanban');
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Estado do Modal de Novo Processo
+  // Estados dos Modais
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
-  const [newCaseData, setNewCaseData] = useState({ client: '', phone: '', title: '' });
+  const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
+  const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
 
-  // FUNÇÃO NOVA: Formata o telefone automaticamente para o Modal de Novo Processo
+  // Estados dos Formulários
+  const [newCaseData, setNewCaseData] = useState({ client: '', phone: '', title: '' });
+  const [newFinData, setNewFinData] = useState({ title: '', client: '', amount: '', dueDate: '', type: 'Boleto' });
+  const [newDocData, setNewDocData] = useState({ name: '', client: '' });
+
   const handleNewCasePhoneChange = (e) => {
     let value = e.target.value.replace(/\D/g, ''); 
     if (value.length > 11) value = value.slice(0, 11); 
@@ -589,20 +593,36 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     setTimeout(() => setNotification(null), 7000);
   };
 
+  // Funções de Submissão
   const handleAddNewCase = (e) => {
     e.preventDefault();
-    
-    // VALIDAÇÃO: Verifica se tem o tamanho correto antes de salvar
     const rawPhone = newCaseData.phone.replace(/\D/g, '');
     if (rawPhone.length < 10) {
       alert("Por favor, digite um número de celular válido com o DDD.");
       return;
     }
-
     onAddCase(newCaseData);
     setIsAddCaseModalOpen(false);
     setNewCaseData({ client: '', phone: '', title: '' });
     setNotification({ title: "Processo Cadastrado", message: "O novo cliente foi adicionado à carteira.", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleAddNewFin = (e) => {
+    e.preventDefault();
+    onAddFinancial(newFinData);
+    setIsAddFinModalOpen(false);
+    setNewFinData({ title: '', client: '', amount: '', dueDate: '', type: 'Boleto' });
+    setNotification({ title: "Fatura Lançada", message: "A nova cobrança já está disponível no painel.", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleAddNewDoc = (e) => {
+    e.preventDefault();
+    onAddDocument(newDocData);
+    setIsAddDocModalOpen(false);
+    setNewDocData({ name: '', client: '' });
+    setNotification({ title: "Arquivo Salvo", message: "O documento foi anexado ao cliente com sucesso.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -656,6 +676,62 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </form>
       </Modal>
 
+      {/* Modal Nova Fatura */}
+      <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura">
+        <form onSubmit={handleAddNewFin} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
+            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Carlos Silva" value={newFinData.client} onChange={e => setNewFinData({...newFinData, client: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição da Fatura</label>
+            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Honorários 1/10" value={newFinData.title} onChange={e => setNewFinData({...newFinData, title: e.target.value})} />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
+              <input required type="number" step="0.01" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="1500.00" value={newFinData.amount} onChange={e => setNewFinData({...newFinData, amount: e.target.value})} />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vencimento</label>
+              <input required type="date" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.dueDate} onChange={e => setNewFinData({...newFinData, dueDate: e.target.value})} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forma de Pagamento</label>
+            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.type} onChange={e => setNewFinData({...newFinData, type: e.target.value})}>
+              <option value="Boleto">Boleto</option>
+              <option value="Pix">Pix</option>
+              <option value="Cartão">Cartão</option>
+            </select>
+          </div>
+          <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
+            Lançar Cobrança
+          </button>
+        </form>
+      </Modal>
+
+      {/* Modal Novo Documento */}
+      <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload de Arquivo">
+        <form onSubmit={handleAddNewDoc} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
+            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Carlos Silva" value={newDocData.client} onChange={e => setNewDocData({...newDocData, client: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Arquivo</label>
+            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Contrato_Assinado.pdf" value={newDocData.name} onChange={e => setNewDocData({...newDocData, name: e.target.value})} />
+          </div>
+          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50">
+             <UploadCloud className="w-8 h-8 mb-2 text-indigo-300" />
+             <p className="text-xs font-bold">Anexar arquivo falso para teste</p>
+          </div>
+          <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
+            Salvar Documento
+          </button>
+        </form>
+      </Modal>
+
       {/* Menu Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
@@ -691,14 +767,22 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div className="flex items-center gap-4 md:gap-6">
             
-            {/* BOTÃO MÁGICO DE NOVO PROCESSO FICA AQUI */}
-            <button 
-              onClick={() => setIsAddCaseModalOpen(true)}
-              className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Novo Processo</span>
-            </button>
+            {/* BOTÃO MÁGICO DINÂMICO DE ACORDO COM A ABA ATUAL */}
+            {activeTab === 'kanban' && (
+              <button onClick={() => setIsAddCaseModalOpen(true)} className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Processo</span>
+              </button>
+            )}
+            {activeTab === 'finance' && (
+              <button onClick={() => setIsAddFinModalOpen(true)} className="bg-green-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-green-200 hover:bg-green-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nova Fatura</span>
+              </button>
+            )}
+            {activeTab === 'docs' && (
+              <button onClick={() => setIsAddDocModalOpen(true)} className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+                <UploadCloud className="w-4 h-4" /> <span className="hidden sm:inline">Upload Arquivo</span>
+              </button>
+            )}
 
             <div className="hidden md:flex flex-col text-right border-l pl-6 border-slate-200">
               <span className="text-sm font-extrabold text-slate-800">{TENANT_CONFIG.advogado}</span>
@@ -903,7 +987,7 @@ export default function App() {
   
   const [cases, setCases] = useState([]);
   
-  // Módulos que continuarão preservados
+  // Módulos que continuarão preservados (Ainda usam localStorage até ligarmos na API de verdade)
   const [leads, setLeads] = useStickyState(DEFAULT_LEADS, 'pascale_leads');
   const [messages, setMessages] = useStickyState(DEFAULT_MESSAGES, 'pascale_messages');
   const [documents, setDocuments] = useStickyState(DEFAULT_DOCUMENTS, 'pascale_documents');
@@ -993,10 +1077,17 @@ export default function App() {
     } catch (e) { console.error("Erro ao enviar Lead", e); }
   };
 
+  // FUNÇÕES DE MANIPULAÇÃO LOCAL (Serão integradas à API no futuro)
   const updateLeadStatus = (id, newStatus) => setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
   const handleSendMessage = (text, sender) => setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
-  const handleUploadDocument = (filename) => setDocuments(prev => [{ id: Date.now(), name: filename, client: "Carlos Silva", date: "Hoje", size: "2.4 MB" }, ...prev]);
+  
+  // Funções novas para o Dr. Renzo gerenciar!
+  const handleUploadDocument = (docData) => setDocuments(prev => [{ id: Date.now(), name: docData.name, client: docData.client, date: "Hoje", size: "1.5 MB" }, ...prev]);
+  
+  const handleAddFinancial = (finData) => setFinancials(prev => [{ id: Date.now(), title: finData.title, client: finData.client, amount: parseFloat(finData.amount), dueDate: finData.dueDate, status: "Aberto", type: finData.type }, ...prev]);
+  
   const updateFinancial = (id, newStatus) => setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
+  
   const notifyLawyer = (message) => setGlobalNotifications(prev => [...prev, message]);
 
   // ROTAS INTERNAS
@@ -1007,7 +1098,21 @@ export default function App() {
       case 'login': return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
       case 'dashboard': 
         if (!isAuthenticated) return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
-        return <LawyerDashboard onNavigate={setCurrentView} cases={cases} onMoveCase={moveCase} onAddCase={addCase} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} globalNotifications={globalNotifications} onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} onUpdateLead={updateLeadStatus} />;
+        return <LawyerDashboard 
+          onNavigate={setCurrentView} 
+          cases={cases} 
+          onMoveCase={moveCase} 
+          onAddCase={addCase} 
+          leads={leads} 
+          documents={documents} 
+          financials={financials} 
+          onUpdateFinancial={updateFinancial} 
+          onAddFinancial={handleAddFinancial}
+          onAddDocument={handleUploadDocument}
+          globalNotifications={globalNotifications} 
+          onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} 
+          onUpdateLead={updateLeadStatus} 
+        />;
       default: return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
     }
   };
