@@ -529,6 +529,16 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
   const [newCaseData, setNewCaseData] = useState({ client: '', phone: '', title: '' });
 
+  // FUNÇÃO NOVA: Formata o telefone automaticamente para o Modal de Novo Processo
+  const handleNewCasePhoneChange = (e) => {
+    let value = e.target.value.replace(/\D/g, ''); 
+    if (value.length > 11) value = value.slice(0, 11); 
+    let formatted = value;
+    if (value.length > 2) formatted = `(${value.slice(0, 2)}) ${value.slice(2)}`;
+    if (value.length > 7) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
+    setNewCaseData({ ...newCaseData, phone: formatted });
+  };
+
   useEffect(() => {
     if (globalNotifications && globalNotifications.length > 0) {
       const latest = globalNotifications[globalNotifications.length - 1];
@@ -581,6 +591,14 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
   const handleAddNewCase = (e) => {
     e.preventDefault();
+    
+    // VALIDAÇÃO: Verifica se tem o tamanho correto antes de salvar
+    const rawPhone = newCaseData.phone.replace(/\D/g, '');
+    if (rawPhone.length < 10) {
+      alert("Por favor, digite um número de celular válido com o DDD.");
+      return;
+    }
+
     onAddCase(newCaseData);
     setIsAddCaseModalOpen(false);
     setNewCaseData({ client: '', phone: '', title: '' });
@@ -617,7 +635,16 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp (Celular)</label>
-            <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: e.target.value})} />
+            <input 
+              required 
+              type="tel" 
+              minLength={14} 
+              maxLength={15} 
+              className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" 
+              placeholder="(11) 99999-9999" 
+              value={newCaseData.phone} 
+              onChange={handleNewCasePhoneChange} 
+            />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Ação</label>
