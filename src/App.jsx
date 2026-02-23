@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Gavel, 
   Users, 
@@ -122,29 +122,12 @@ const useStickyState = (defaultValue, key) => {
   return [value, setValue];
 };
 
-// --- COMPONENTES DE INTERFACE ---
-const Modal = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-slide-up">
-        <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-lg">{title}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-6 overflow-y-auto max-h-[80vh]">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-};
+// --- FUNÇÕES UTILITÁRIAS GLOBAIS (DRY - Don't Repeat Yourself) ---
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-// Formatar data do padrão internacional (AAAA-MM-DD) para brasileiro (DD/MM/AAAA)
 const formatDate = (dateString) => {
   if (!dateString) return '';
   if (dateString.includes('-')) {
@@ -153,6 +136,34 @@ const formatDate = (dateString) => {
   }
   return dateString;
 };
+
+// 🚀 OTIMIZAÇÃO: Centraliza a lógica de formatação de telefone
+const applyPhoneMask = (value) => {
+  let v = value.replace(/\D/g, ''); 
+  if (v.length > 11) v = v.slice(0, 11); 
+  if (v.length > 2) v = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+  if (v.length > 7) v = `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
+  return v;
+};
+
+// --- COMPONENTES DE INTERFACE ---
+const Modal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[90vh]">
+        <div className="p-4 border-b flex justify-between items-center bg-slate-50 flex-shrink-0">
+          <h3 className="font-bold text-lg text-slate-800">{title}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition text-slate-500"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-6 overflow-y-auto custom-scrollbar">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // ============================================================================
 // 0. PÁGINA DE LOGIN
@@ -219,12 +230,8 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
   const [showNotification, setShowNotification] = useState(false);
 
   const handlePhoneChange = (e) => {
-    let value = e.target.value.replace(/\D/g, ''); 
-    if (value.length > 11) value = value.slice(0, 11); 
-    let formatted = value;
-    if (value.length > 2) formatted = `(${value.slice(0, 2)}) ${value.slice(2)}`;
-    if (value.length > 7) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
-    setFormData({ ...formData, phone: formatted });
+    // 🚀 OTIMIZAÇÃO: Usa a função global
+    setFormData({ ...formData, phone: applyPhoneMask(e.target.value) });
   };
 
   const handleSubmit = (e) => {
@@ -338,6 +345,14 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
   const [showNotification, setShowNotification] = useState(false);
   const chatEndRef = useRef(null);
 
+  // 🚀 OTIMIZAÇÃO: Memoriza os dados financeiros do cliente logado
+  const { myFinancials, totalPendente } = useMemo(() => {
+    if (!caseData) return { myFinancials: [], totalPendente: 0 };
+    const filtered = financials.filter(f => f.client === caseData.client || f.client === "Carlos Silva");
+    const total = filtered.filter(f => f.status !== 'Pago').reduce((acc, curr) => acc + curr.amount, 0);
+    return { myFinancials: filtered, totalPendente: total };
+  }, [financials, caseData]);
+
   useEffect(() => {
     if (chatOpen && chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -368,8 +383,6 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     }, 1500);
   };
 
-  const myFinancials = financials.filter(f => f.client === "Carlos Silva" || f.client === caseData?.client);
-
   if (!caseData) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
       <Activity className="w-12 h-12 mb-4 text-slate-300 animate-spin" />
@@ -392,10 +405,10 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
           <div className="bg-indigo-50 p-4 rounded-lg flex justify-between items-center mb-4 border border-indigo-100">
              <span className="text-sm font-bold text-indigo-900">Total Pendente</span>
              <span className="text-xl font-extrabold text-indigo-700">
-               {formatCurrency(myFinancials.filter(f => f.status !== 'Pago').reduce((acc, curr) => acc + curr.amount, 0))}
+               {formatCurrency(totalPendente)}
              </span>
           </div>
-          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+          <div className="space-y-3">
              {myFinancials.map(fin => (
                <div key={fin.id} className="border border-slate-200 rounded-lg p-3 flex justify-between items-center bg-white shadow-sm">
                  <div>
@@ -528,8 +541,26 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Extrai apenas os nomes únicos de clientes que têm processos na base de dados
-  const activeClients = Array.from(new Set(cases.map(c => typeof c.client === 'object' ? c.client?.name : c.client))).filter(Boolean);
+  // 🚀 OTIMIZAÇÃO: useMemo para não recalcular clientes a cada digitação nos formulários
+  const activeClients = useMemo(() => {
+    return Array.from(new Set(cases.map(c => typeof c.client === 'object' ? c.client?.name : c.client))).filter(Boolean);
+  }, [cases]);
+
+  // 🚀 OTIMIZAÇÃO: useMemo para cálculos financeiros (Não bloqueia a thread de renderização)
+  const { totalRevenue, openRevenue, lateRevenue } = useMemo(() => {
+    return {
+      totalRevenue: financials.filter(f => f.status === 'Pago').reduce((acc, curr) => acc + curr.amount, 0),
+      openRevenue: financials.filter(f => f.status === 'Aberto').reduce((acc, curr) => acc + curr.amount, 0),
+      lateRevenue: financials.filter(f => f.status === 'Atrasado').reduce((acc, curr) => acc + curr.amount, 0),
+    };
+  }, [financials]);
+
+  // 🚀 OTIMIZAÇÃO: Agrupamento Kanban único
+  const groupedCases = useMemo(() => ({
+    peticao: cases.filter(c => c.stage === 'peticao'),
+    analise_juiz: cases.filter(c => c.stage === 'analise_juiz'),
+    sentenca: cases.filter(c => c.stage === 'sentenca')
+  }), [cases]);
 
   // Estados dos Modais
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
@@ -548,12 +579,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [finCustomTitle, setFinCustomTitle] = useState('');
 
   const handleNewCasePhoneChange = (e) => {
-    let value = e.target.value.replace(/\D/g, ''); 
-    if (value.length > 11) value = value.slice(0, 11); 
-    let formatted = value;
-    if (value.length > 2) formatted = `(${value.slice(0, 2)}) ${value.slice(2)}`;
-    if (value.length > 7) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
-    setNewCaseData({ ...newCaseData, phone: formatted });
+    setNewCaseData({ ...newCaseData, phone: applyPhoneMask(e.target.value) });
   };
 
   useEffect(() => {
@@ -623,7 +649,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // FATURA INTELIGENTE
   const handleAddNewFin = (e) => {
     e.preventDefault();
     
@@ -633,7 +658,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       return;
     }
 
-    // Lógica para montar o título da fatura
     let finalTitle = finChargeType;
     if (finChargeType === 'Parcelamento') {
       finalTitle = `Parcela ${finCurrentInstallment}/${finTotalInstallments}`;
@@ -643,7 +667,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
     onAddFinancial({ ...newFinData, title: finalTitle });
     
-    // Reseta o formulário
     setIsAddFinModalOpen(false);
     setNewFinData({ client: '', amount: '', dueDate: '', type: 'Boleto' });
     setFinChargeType('Honorários Iniciais');
@@ -738,7 +761,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
 
           {finChargeType === 'Parcelamento' && (
-            <div className="flex gap-4">
+            <div className="flex gap-4 animate-fade-in">
               <div className="flex-1">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parcela Atual</label>
                 <input required type="number" min="1" max={finTotalInstallments} className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finCurrentInstallment} onChange={e => setFinCurrentInstallment(e.target.value)} />
@@ -751,7 +774,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           )}
 
           {finChargeType === 'Outro' && (
-            <div>
+            <div className="animate-fade-in">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição Livre</label>
               <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Custas Judiciais / Emissão Documentos" value={finCustomTitle} onChange={e => setFinCustomTitle(e.target.value)} />
             </div>
@@ -873,9 +896,9 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           {activeTab === 'finance' ? (
             <div className="animate-fade-in space-y-6 md:space-y-10">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
-                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Receita Total Líquida</div><div className="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">{formatCurrency(financials.filter(f => f.status === 'Pago').reduce((acc, curr) => acc + curr.amount, 0))}</div><div className="mt-4 flex items-center gap-1 text-green-500 text-[10px] font-bold"><TrendingUp className="w-3 h-3" /> +12% vs mês anterior</div></div>
-                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Honorários em Aberto</div><div className="text-3xl md:text-4xl font-extrabold text-orange-500 tracking-tight">{formatCurrency(financials.filter(f => f.status === 'Aberto').reduce((acc, curr) => acc + curr.amount, 0))}</div></div>
-                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Crédito de Risco</div><div className="text-3xl md:text-4xl font-extrabold text-red-600 tracking-tight">{formatCurrency(financials.filter(f => f.status === 'Atrasado').reduce((acc, curr) => acc + curr.amount, 0))}</div></div>
+                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Receita Total Líquida</div><div className="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">{formatCurrency(totalRevenue)}</div><div className="mt-4 flex items-center gap-1 text-green-500 text-[10px] font-bold"><TrendingUp className="w-3 h-3" /> +12% vs mês anterior</div></div>
+                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Honorários em Aberto</div><div className="text-3xl md:text-4xl font-extrabold text-orange-500 tracking-tight">{formatCurrency(openRevenue)}</div></div>
+                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Crédito de Risco</div><div className="text-3xl md:text-4xl font-extrabold text-red-600 tracking-tight">{formatCurrency(lateRevenue)}</div></div>
                </div>
                <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
                    <table className="w-full text-left text-sm min-w-[600px]">
@@ -985,9 +1008,9 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
               {/* KANBAN BOARD */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
                 {[
-                  { id: 'peticao', title: 'Fase Inicial (Petição)', color: 'border-slate-300' },
-                  { id: 'analise_juiz', title: 'Em Andamento (Juiz)', color: 'border-indigo-400' },
-                  { id: 'sentenca', title: 'Concluído (Sentença)', color: 'border-green-400' }
+                  { id: 'peticao', title: 'Fase Inicial (Petição)', color: 'border-slate-300', items: groupedCases.peticao },
+                  { id: 'analise_juiz', title: 'Em Andamento (Juiz)', color: 'border-indigo-400', items: groupedCases.analise_juiz },
+                  { id: 'sentenca', title: 'Concluído (Sentença)', color: 'border-green-400', items: groupedCases.sentenca }
                 ].map(col => (
                   <div key={col.id} className="bg-slate-200/40 rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-8 border border-slate-200/50 min-h-[400px] md:min-h-[550px] flex flex-col gap-4 md:gap-6 backdrop-blur-sm">
                     <div className="flex justify-between items-center px-2 md:px-4 mb-2">
@@ -995,9 +1018,9 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <div className={`w-2 h-2 rounded-full border-2 ${col.color} bg-white`}></div>
                          {col.title}
                        </span>
-                       <span className="bg-white text-slate-800 font-extrabold text-[10px] px-3 py-1 rounded-full shadow-sm border border-slate-200">{cases.filter(c => c.stage === col.id).length}</span>
+                       <span className="bg-white text-slate-800 font-extrabold text-[10px] px-3 py-1 rounded-full shadow-sm border border-slate-200">{col.items.length}</span>
                     </div>
-                    {cases.filter(c => c.stage === col.id).map(c => (
+                    {col.items.map(c => (
                       <div key={c.id} className={`bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-[6px] transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 md:hover:-translate-y-2 group relative overflow-hidden ${c.anxietyScore > 70 ? 'border-l-red-500' : 'border-l-indigo-600'}`}>
                          <div className="flex justify-between items-start mb-4">
                            <span className="text-[8px] md:text-[9px] font-extrabold uppercase bg-slate-50 text-slate-500 px-3 py-1 rounded-full tracking-tighter">{c.status}</span>
@@ -1036,7 +1059,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                       </div>
                     ))}
                     
-                    {cases.filter(c => c.stage === col.id).length === 0 && (
+                    {col.items.length === 0 && (
                       <div className="h-24 border-2 border-dashed border-slate-300/50 rounded-2xl flex items-center justify-center text-slate-400 text-xs font-bold">
                         Nenhum processo nesta fase
                       </div>
@@ -1273,17 +1296,8 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
       `}</style>
-      
-      {/* ========================================================================
-        CONTROLE MASTER DESABILITADO (COMENTADO)
-        ========================================================================
-      */}
-      {/* <div className="fixed bottom-3 md:bottom-6 left-3 md:left-6 right-3 md:right-auto z-[200] bg-slate-950/90 backdrop-blur-2xl text-white px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[2rem] shadow-2xl flex justify-center md:justify-start gap-2 md:gap-8 text-[9px] md:text-[11px] font-extrabold border border-white/10 items-center ring-1 ring-white/20">
-        <span className="hidden md:inline text-slate-600 uppercase tracking-[0.3em] border-r border-slate-800 pr-8 py-1">Controle Master</span>
-        <button onClick={() => setCurrentView('landing')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'landing' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>1. SITE</button>
-        <button onClick={() => setCurrentView('portal')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'portal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>2. PORTAL</button>
-        <button onClick={() => setCurrentView('dashboard')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'dashboard' || currentView === 'login' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>3. PAINEL</button>
-      </div> */}
+
+      {/* Controle Master comentado para manter o foco na Gestão */}
 
       {renderView()}
     </div>
