@@ -713,14 +713,16 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
           ) : (
             <div className="animate-fade-in space-y-8 md:space-y-12">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-                <div className="bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
+                
+                {/* 1. O Bloco de Processos em Carteira */}
+                <div onClick={() => setNotification({ title: "Processos Ativos", message: `Você tem ${cases.length} processos sendo geridos no momento.`, type: "info" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-indigo-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
                   <div className="text-[9px] md:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Processos em Carteira</div>
                   <div className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tighter">{cases.length}</div>
                 </div>
                 
-                {/* O Bloco de Estatística de Ansiedade */}
-                <div className="bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
+                {/* 2. O Bloco de Estatística de Ansiedade */}
+                <div onClick={() => setNotification({ title: "Alerta de Ansiedade", message: `Existem ${cases.filter(c => c.anxietyScore > 70).length} clientes que precisam de atenção. Role para baixo e veja os alertas vermelhos.`, type: "warning" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
                    <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-red-50 rounded-bl-full group-hover:scale-125 transition duration-700 opacity-60 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-red-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
                      Índice de Ansiedade <AlertTriangle className="w-3 h-3" />
@@ -728,6 +730,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                    <div className="text-3xl md:text-5xl font-extrabold text-red-600 tracking-tighter">{cases.filter(c => c.anxietyScore > 70).length}</div>
                 </div>
                 
+                {/* 3. O Bloco de Conversões Pendentes (Já funcionava) */}
                 <div onClick={() => setActiveTab('leads')} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
                    <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-green-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-green-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
@@ -735,11 +738,14 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                    </div>
                    <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads.filter(l => l.status === 'Novo').length}</div>
                 </div>
-                <div className="bg-indigo-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500">
+
+                {/* 4. O Bloco de Eficiência */}
+                <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema gerou 8.4 mil ações automáticas neste mês, poupando tempo valioso da sua equipe.", type: "success" })} className="cursor-pointer bg-indigo-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500">
                    <div className="text-[9px] md:text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Eficiência</div>
                    <div className="text-3xl md:text-5xl font-extrabold text-white tracking-tighter">8.4k</div>
                    <p className="text-[8px] md:text-[9px] text-indigo-400 mt-2 md:mt-3 font-extrabold uppercase tracking-wider">Avisos Proativos</p>
                 </div>
+
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
