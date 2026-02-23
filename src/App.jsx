@@ -211,7 +211,7 @@ const LoginPage = ({ onLogin }) => {
 // 1. LANDING PAGE (Site Público)
 const LandingPage = ({ onNavigate, onAddLead }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', phone: '', type: 'Cível' });
+  const [formData, setFormData] = useState({ name: '', phone: '', type: 'Usucapião' });
   const [showNotification, setShowNotification] = useState(false);
 
   // Formata o telefone automaticamente (XX) XXXXX-XXXX
@@ -247,7 +247,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
       status: "Novo",
       date: "Agora mesmo"
     });
-    setFormData({ name: '', phone: '', type: 'Cível' });
+    setFormData({ name: '', phone: '', type: 'Usucapião' });
     setIsModalOpen(false);
     
     setShowNotification(true);
@@ -287,6 +287,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Caso</label>
               <select className="w-full p-3 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+                <option value="Usucapião">Usucapião (Imobiliário)</option>
                 <option value="Trabalhista">Trabalhista</option>
                 <option value="Cível">Cível / Consumidor</option>
                 <option value="Família">Família (Divórcio/Pensão)</option>
@@ -520,7 +521,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 };
 
 // 3. PAINEL DO ADVOGADO
-const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, financials, onUpdateFinancial, globalNotifications, onLogout }) => {
+const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, financials, onUpdateFinancial, globalNotifications, onLogout, onUpdateLead }) => {
   const [activeTab, setActiveTab] = useState('kanban');
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -544,6 +545,26 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
     onUpdateFinancial(id, "Pago");
     setNotification({ title: "Financeiro", message: "Pagamento registrado com sucesso.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleAttendLead = (lead) => {
+    // 1. Atualiza o status no painel de Novo para Contatado
+    if (lead.status === 'Novo') {
+      onUpdateLead(lead.id, 'Contatado');
+    }
+    
+    // 2. Limpa o telefone para o formato do WhatsApp (só números) e adiciona o 55 (Brasil)
+    const phoneDigits = lead.phone.replace(/\D/g, '');
+    
+    // 3. Monta a mensagem mágica de primeiro contato
+    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como o Dr. Marcos pode te ajudar hoje?`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    // 4. Abre o WhatsApp com tudo pronto
+    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
+    
+    setNotification({ title: "Atendimento Iniciado", message: `Abrindo WhatsApp para ${lead.name}...`, type: "success" });
+    setTimeout(() => setNotification(null), 4000);
   };
 
   const handleAnxietyClick = (clientName) => {
@@ -656,7 +677,15 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, leads, documents, fina
                          <td className="p-4 md:p-8"><span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-tighter">{lead.type}</span></td>
                          <td className="p-4 md:p-8 text-slate-400 font-medium">{lead.date}</td>
                          <td className="p-4 md:p-8"><span className={`px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase ${lead.status === 'Novo' ? 'bg-green-100 text-green-700 animate-pulse' : 'bg-slate-100 text-slate-500'}`}>{lead.status}</span></td>
-                         <td className="p-4 md:p-8 text-right"><button className="bg-indigo-600 text-white font-extrabold hover:bg-indigo-700 px-4 md:px-5 py-2.5 rounded-xl text-[10px] transition shadow-lg shadow-indigo-900/10">Atender</button></td>
+                         <td className="p-4 md:p-8 text-right">
+                           <button 
+                             onClick={() => handleAttendLead(lead)} 
+                             className={`${lead.status === 'Novo' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/10' : 'bg-green-500 hover:bg-green-600 shadow-green-900/10'} text-white font-extrabold px-4 md:px-5 py-2.5 rounded-xl text-[10px] transition shadow-lg flex items-center gap-2 ml-auto`}
+                           >
+                             <MessageSquare className="w-3 h-3" />
+                             {lead.status === 'Novo' ? 'Atender' : 'WhatsApp'}
+                           </button>
+                         </td>
                        </tr>
                      ))}
                    </tbody>
@@ -775,6 +804,10 @@ export default function App() {
 
   const addLead = (newLead) => setLeads(prev => [newLead, ...prev]);
 
+  const updateLeadStatus = (id, newStatus) => {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+  };
+
   const handleSendMessage = (text, sender) => {
     setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
   };
@@ -796,7 +829,7 @@ export default function App() {
       case 'portal': return <ClientPortal onNavigate={setCurrentView} caseData={cases[0]} onNotifyLawyer={notifyLawyer} messages={messages} onSendMessage={handleSendMessage} onUploadDocument={handleUploadDocument} financials={financials} />;
       case 'dashboard': 
         if (!isAuthenticated) return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
-        return <LawyerDashboard onNavigate={setCurrentView} cases={cases} onMoveCase={moveCase} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} globalNotifications={globalNotifications} onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} />;
+        return <LawyerDashboard onNavigate={setCurrentView} cases={cases} onMoveCase={moveCase} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} globalNotifications={globalNotifications} onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} onUpdateLead={updateLeadStatus} />;
       default: return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} />;
     }
   };
