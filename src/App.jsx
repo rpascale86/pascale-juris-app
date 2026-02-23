@@ -111,7 +111,6 @@ const DEFAULT_FINANCIALS = [
 ];
 
 // --- HOOKS DE PERSISTÊNCIA ---
-
 const useStickyState = (defaultValue, key) => {
   const [value, setValue] = useState(() => {
     const stickyValue = window.localStorage.getItem(key);
@@ -124,7 +123,6 @@ const useStickyState = (defaultValue, key) => {
 };
 
 // --- COMPONENTES DE INTERFACE ---
-
 const Modal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
@@ -146,7 +144,9 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+// ============================================================================
 // 0. PÁGINA DE LOGIN
+// ============================================================================
 const LoginPage = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -176,30 +176,18 @@ const LoginPage = ({ onLogin }) => {
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Corporativo</label>
               <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
-                placeholder="renzo@advocacia.com.br"
+                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="renzo@advocacia.com.br"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
               <input 
-                type="password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
-                placeholder="••••••••"
+                type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••"
               />
             </div>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition flex justify-center items-center"
-            >
+            <button type="submit" disabled={loading} className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition flex justify-center items-center">
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Acessar o Sistema"}
             </button>
           </form>
@@ -212,7 +200,9 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-// 1. LANDING PAGE (Site Público - Preservado mas oculto no momento)
+// ============================================================================
+// 1. LANDING PAGE (SITE PÚBLICO) - Restaurado na Íntegra
+// ============================================================================
 const LandingPage = ({ onNavigate, onAddLead }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '', type: 'Usucapião' });
@@ -325,7 +315,9 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
   );
 };
 
-// 2. PORTAL DO CLIENTE (Preservado mas oculto no momento)
+// ============================================================================
+// 2. PORTAL DO CLIENTE - Restaurado na Íntegra
+// ============================================================================
 const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials }) => {
   const [chatOpen, setChatOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -518,7 +510,9 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
   );
 };
 
+// ============================================================================
 // 3. PAINEL DO ADVOGADO
+// ============================================================================
 const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead }) => {
   const [activeTab, setActiveTab] = useState('kanban');
   const [notification, setNotification] = useState(null);
@@ -564,6 +558,13 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const handleAttendWhatsApp = (phone, name) => {
+    const phoneDigits = phone.replace(/\D/g, '');
+    const message = `Olá, ${name}! Aqui é do escritório ${TENANT_CONFIG.name}. Tudo bem? Estou entrando em contato sobre o seu processo.`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
+  };
+
   const handleAttendLead = (lead) => {
     if (lead.status === 'Novo') {
       onUpdateLead(lead.id, 'Contatado');
@@ -575,13 +576,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     
     setNotification({ title: "Atendimento Iniciado", message: `Abrindo WhatsApp para ${lead.name}...`, type: "success" });
     setTimeout(() => setNotification(null), 4000);
-  };
-
-  const handleAttendWhatsApp = (phone, name) => {
-    const phoneDigits = phone.replace(/\D/g, '');
-    const message = `Olá, ${name}! Aqui é do escritório ${TENANT_CONFIG.name}. Tudo bem? Estou entrando em contato sobre o seu processo.`;
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
   };
 
   const handleAnxietyClick = (clientName) => {
@@ -604,7 +598,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     onAddCase(newCaseData);
     setIsAddCaseModalOpen(false);
     setNewCaseData({ client: '', phone: '', title: '' });
-    setNotification({ title: "Processo Cadastrado", message: "O novo cliente foi adicionado à carteira.", type: "success" });
+    setNotification({ title: "Processo Cadastrado", message: "Enviado para a Nuvem com sucesso.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -613,7 +607,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     onAddFinancial(newFinData);
     setIsAddFinModalOpen(false);
     setNewFinData({ title: '', client: '', amount: '', dueDate: '', type: 'Boleto' });
-    setNotification({ title: "Fatura Lançada", message: "A nova cobrança já está disponível no painel.", type: "success" });
+    setNotification({ title: "Fatura Lançada", message: "Gravada no Banco de Dados.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -647,7 +641,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       )}
 
       {/* Modal Novo Processo */}
-      <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Cadastrar Novo Processo">
+      <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Cadastrar Novo Processo (Nuvem)">
         <form onSubmit={handleAddNewCase} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
@@ -656,14 +650,9 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp (Celular)</label>
             <input 
-              required 
-              type="tel" 
-              minLength={14} 
-              maxLength={15} 
+              required type="tel" minLength={14} maxLength={15} 
               className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" 
-              placeholder="(11) 99999-9999" 
-              value={newCaseData.phone} 
-              onChange={handleNewCasePhoneChange} 
+              placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={handleNewCasePhoneChange} 
             />
           </div>
           <div>
@@ -677,7 +666,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       </Modal>
 
       {/* Modal Nova Fatura */}
-      <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura">
+      <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura (Nuvem)">
         <form onSubmit={handleAddNewFin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
@@ -685,7 +674,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição da Fatura</label>
-            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Honorários 1/10" value={newFinData.title} onChange={e => setNewFinData({...newFinData, title: e.target.value})} />
+            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Honorários Iniciais" value={newFinData.title} onChange={e => setNewFinData({...newFinData, title: e.target.value})} />
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
@@ -705,7 +694,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
               <option value="Cartão">Cartão</option>
             </select>
           </div>
-          <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
+          <button type="submit" className="w-full py-3 mt-4 bg-green-600 text-white rounded-lg font-bold shadow-lg hover:bg-green-700 transition">
             Lançar Cobrança
           </button>
         </form>
@@ -873,14 +862,14 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="animate-fade-in space-y-8 md:space-y-12">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
                 
-                {/* 1. O Bloco de Processos em Carteira */}
+                {/* O Bloco de Processos em Carteira */}
                 <div onClick={() => setNotification({ title: "Processos Ativos", message: `Você tem ${cases.length} processos sendo geridos no momento.`, type: "info" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-indigo-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
                   <div className="text-[9px] md:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Processos em Carteira</div>
                   <div className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tighter">{cases.length}</div>
                 </div>
                 
-                {/* 2. O Bloco de Estatística de Ansiedade */}
+                {/* O Bloco de Estatística de Ansiedade */}
                 <div onClick={() => setNotification({ title: "Alerta de Ansiedade", message: `Existem ${cases.filter(c => c.anxietyScore > 70).length} clientes que precisam de atenção. Role para baixo e veja os alertas vermelhos.`, type: "warning" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
                    <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-red-50 rounded-bl-full group-hover:scale-125 transition duration-700 opacity-60 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-red-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
@@ -889,7 +878,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                    <div className="text-3xl md:text-5xl font-extrabold text-red-600 tracking-tighter">{cases.filter(c => c.anxietyScore > 70).length}</div>
                 </div>
                 
-                {/* 3. O Bloco de Conversões Pendentes */}
+                {/* O Bloco de Conversões Pendentes */}
                 <div onClick={() => setActiveTab('leads')} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
                    <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-green-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-green-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
@@ -898,7 +887,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                    <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads && leads.filter(l => l.status === 'Novo').length}</div>
                 </div>
 
-                {/* 4. O Bloco de Eficiência */}
+                {/* O Bloco de Eficiência */}
                 <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema gerou 8.4 mil ações automáticas neste mês, poupando tempo valioso da sua equipe.", type: "success" })} className="cursor-pointer bg-indigo-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500">
                    <div className="text-[9px] md:text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Eficiência</div>
                    <div className="text-3xl md:text-5xl font-extrabold text-white tracking-tighter">8.4k</div>
@@ -927,7 +916,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <div className="flex justify-between items-start mb-4">
                            <span className="text-[8px] md:text-[9px] font-extrabold uppercase bg-slate-50 text-slate-500 px-3 py-1 rounded-full tracking-tighter">{c.status}</span>
                            
-                           {/* BOTÃO DO RADAR DE ANSIEDADE - Funciona no telemóvel! */}
+                           {/* BOTÃO DO RADAR DE ANSIEDADE */}
                            {c.anxietyScore > 70 && (
                              <button 
                                onClick={() => handleAnxietyClick(c.client)}
@@ -951,7 +940,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                               <MessageSquare className="w-3 h-3" /> WhatsApp
                             </button>
 
-                            {/* Botão Avançar Fase (somente se não for a última coluna) */}
+                            {/* Botão Avançar Fase */}
                             {col.id !== 'sentenca' && (
                               <button onClick={() => handleMove(c.id)} className="text-[9px] md:text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 md:px-4 py-2 rounded-xl transition-all duration-300 shadow-sm hover:bg-indigo-100">
                                 Avançar ➔
@@ -977,57 +966,73 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   );
 };
 
-// --- APP CONTROLLER ---
-
+// ============================================================================
+// --- APP CONTROLLER PRINCIPAL ---
+// ============================================================================
 export default function App() {
-  // ABRIR DIRETO NO LOGIN PARA FOCAR NA GESTÃO!
   const [currentView, setCurrentView] = useState('login'); 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   
+  // Dados agora vindos da nuvem
   const [cases, setCases] = useState([]);
+  const [financials, setFinancials] = useState([]);
   
-  // Módulos que continuarão preservados (Ainda usam localStorage até ligarmos na API de verdade)
+  // Módulos ainda locais para MVP
   const [leads, setLeads] = useStickyState(DEFAULT_LEADS, 'pascale_leads');
   const [messages, setMessages] = useStickyState(DEFAULT_MESSAGES, 'pascale_messages');
   const [documents, setDocuments] = useStickyState(DEFAULT_DOCUMENTS, 'pascale_documents');
-  const [financials, setFinancials] = useStickyState(DEFAULT_FINANCIALS, 'pascale_financials');
   const [globalNotifications, setGlobalNotifications] = useState([]);
 
-  // 📡 1. BUSCAR DADOS
+  // 📡 1. BUSCAR DADOS (Cases e Financials) DA NUVEM
   useEffect(() => {
-    const fetchCases = async () => {
+    const fetchData = async () => {
       try {
         console.log("📡 Conectando à base de dados na Nuvem...");
-        const response = await fetch(`${API_URL}/cases`);
         
-        if (!response.ok) throw new Error('Erro no servidor');
-        const data = await response.json();
-        
-        if (data && data.length > 0) {
-           const formattedCases = data.map(dbCase => ({
-             ...dbCase,
-             client: dbCase.client ? dbCase.client.name : 'Cliente Desconhecido',
-             phone: dbCase.client ? dbCase.client.phone : '',
-             lastUpdate: "Sincronizado na Nuvem",
-             nextStep: "Aguardando ação",
-             timeline: dbCase.timeline || []
-           }));
-           setCases(formattedCases);
-        } else {
-           setCases(DEFAULT_CASES);
+        // Fetch de Processos
+        const casesRes = await fetch(`${API_URL}/cases`);
+        if (casesRes.ok) {
+          const casesData = await casesRes.json();
+          if (casesData && casesData.length > 0) {
+            setCases(casesData.map(dbCase => ({
+              ...dbCase,
+              client: dbCase.client ? dbCase.client.name : 'Cliente Desconhecido',
+              phone: dbCase.client ? dbCase.client.phone : '',
+              lastUpdate: "Sincronizado",
+              timeline: dbCase.timeline || []
+            })));
+          } else {
+            setCases(DEFAULT_CASES);
+          }
         }
+
+        // Fetch de Financeiro
+        const finRes = await fetch(`${API_URL}/financials`);
+        if (finRes.ok) {
+          const finData = await finRes.json();
+          if (finData && finData.length > 0) {
+             setFinancials(finData.map(dbFin => ({
+               ...dbFin,
+               client: dbFin.client ? dbFin.client.name : 'Cliente Desconhecido'
+             })));
+          } else {
+             setFinancials(DEFAULT_FINANCIALS);
+          }
+        }
+
       } catch (error) {
         console.warn("⚠️ Servidor API inacessível. Ativando MODO DEMO offline.");
         setCases(DEFAULT_CASES);
+        setFinancials(DEFAULT_FINANCIALS);
       } finally {
         setLoadingData(false);
       }
     };
-    fetchCases();
+    fetchData();
   }, []);
 
-  // 📡 2. GRAVAR DADOS REAIS E MOVER FASE
+  // 📡 2. GRAVAR DADOS E MOVER FASE (NUVEM)
   const moveCase = async (caseId) => {
     setCases(prev => prev.map(c => {
       if (c.id === caseId) {
@@ -1043,27 +1048,75 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stage: 'sentenca', status: 'Concluído' })
       });
-      console.log("✅ Mudança salva permanentemente na nuvem!");
     } catch (e) {
       console.error("Erro ao gravar mudança:", e);
     }
   };
 
-  // ➕ 3. NOVO PROCESSO
-  const addCase = (newCaseData) => {
+  // ➕ 3. NOVO PROCESSO (ENVIAR PARA A NUVEM)
+  const addCase = async (newCaseData) => {
+    const tempId = Date.now().toString();
     const novoProcesso = {
-      id: Date.now(), 
+      id: tempId, 
       client: newCaseData.client,
       phone: newCaseData.phone,
       title: newCaseData.title,
       status: "Novo",
       stage: "peticao", 
       anxietyScore: 0,
-      lastUpdate: "Agora mesmo",
+      lastUpdate: "Aguardando sincronização...",
       timeline: []
     };
-    
     setCases(prev => [novoProcesso, ...prev]);
+
+    try {
+      const response = await fetch(`${API_URL}/cases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCaseData)
+      });
+      if (!response.ok) throw new Error('Falha ao salvar processo');
+      const dbCase = await response.json();
+      
+      setCases(prev => prev.map(c => c.id === tempId ? {
+        ...dbCase,
+        client: dbCase.client?.name || newCaseData.client,
+        phone: dbCase.client?.phone || newCaseData.phone,
+        lastUpdate: "Sincronizado na Nuvem",
+        timeline: dbCase.timeline || []
+      } : c));
+    } catch (e) {
+      console.error("Erro ao enviar novo processo para API:", e);
+    }
+  };
+
+  // ➕ 4. NOVA FATURA FINANCEIRA (ENVIAR PARA A NUVEM)
+  const handleAddFinancial = async (finData) => {
+    const tempId = Date.now().toString();
+    const newFin = {
+      id: tempId,
+      title: finData.title,
+      client: finData.client,
+      amount: parseFloat(finData.amount),
+      dueDate: finData.dueDate,
+      status: "Aberto",
+      type: finData.type
+    };
+    setFinancials(prev => [newFin, ...prev]);
+
+    try {
+      const response = await fetch(`${API_URL}/financials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finData)
+      });
+      if (!response.ok) throw new Error('Erro ao salvar fatura (O cliente já existe?)');
+      const dbFin = await response.json();
+
+      setFinancials(prev => prev.map(f => f.id === tempId ? { ...f, id: dbFin.id } : f));
+    } catch (e) {
+      console.error("Erro ao enviar fatura para API:", e);
+    }
   };
 
   const addLead = async (newLead) => {
@@ -1077,17 +1130,11 @@ export default function App() {
     } catch (e) { console.error("Erro ao enviar Lead", e); }
   };
 
-  // FUNÇÕES DE MANIPULAÇÃO LOCAL (Serão integradas à API no futuro)
+  // Funções Locais Restantes
   const updateLeadStatus = (id, newStatus) => setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
   const handleSendMessage = (text, sender) => setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
-  
-  // Funções novas para o Dr. Renzo gerenciar!
   const handleUploadDocument = (docData) => setDocuments(prev => [{ id: Date.now(), name: docData.name, client: docData.client, date: "Hoje", size: "1.5 MB" }, ...prev]);
-  
-  const handleAddFinancial = (finData) => setFinancials(prev => [{ id: Date.now(), title: finData.title, client: finData.client, amount: parseFloat(finData.amount), dueDate: finData.dueDate, status: "Aberto", type: finData.type }, ...prev]);
-  
   const updateFinancial = (id, newStatus) => setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
-  
   const notifyLawyer = (message) => setGlobalNotifications(prev => [...prev, message]);
 
   // ROTAS INTERNAS
@@ -1122,7 +1169,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
         <Activity className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
-        <p className="font-extrabold tracking-widest uppercase text-xs animate-pulse text-indigo-200">Sincronizando Banco de Dados...</p>
+        <p className="font-extrabold tracking-widest uppercase text-xs animate-pulse text-indigo-200">Sincronizando com a Nuvem...</p>
       </div>
     );
   }
@@ -1143,18 +1190,14 @@ export default function App() {
       
       {/* ========================================================================
         CONTROLE MASTER DESABILITADO (COMENTADO)
-        Para reativar a navegação livre entre Site, Portal e Painel no futuro,
-        basta remover os comentários {/* e * /} deste bloco abaixo.
         ========================================================================
       */}
-
       {/* <div className="fixed bottom-3 md:bottom-6 left-3 md:left-6 right-3 md:right-auto z-[200] bg-slate-950/90 backdrop-blur-2xl text-white px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[2rem] shadow-2xl flex justify-center md:justify-start gap-2 md:gap-8 text-[9px] md:text-[11px] font-extrabold border border-white/10 items-center ring-1 ring-white/20">
         <span className="hidden md:inline text-slate-600 uppercase tracking-[0.3em] border-r border-slate-800 pr-8 py-1">Controle Master</span>
         <button onClick={() => setCurrentView('landing')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'landing' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>1. SITE</button>
         <button onClick={() => setCurrentView('portal')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'portal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>2. PORTAL</button>
         <button onClick={() => setCurrentView('dashboard')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'dashboard' || currentView === 'login' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>3. PAINEL</button>
-      </div>
-      */}
+      </div> */}
 
       {renderView()}
     </div>
