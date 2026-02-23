@@ -34,28 +34,35 @@ import {
   Calendar
 } from 'lucide-react';
 
-// --- CONFIGURAÇÃO DA NUVEM E DADOS INICIAIS ---
+// --- CONFIGURAÇÃO DA NUVEM ---
 const API_URL = 'https://pascale-juris-app.onrender.com/api'; 
 
 const TENANT_CONFIG = {
-  name: "Renzo Advogados",
+  name: "Lopes & Associados",
   primaryColor: "bg-slate-900",
   secondaryColor: "text-slate-900",
-  logoText: "RENZO JURIS",
-  advogado: "Dr. Renzo"
+  logoText: "LOPES JURIS",
+  advogado: "Dr. Marcos Lopes"
 };
 
+// --- DADOS DE FALLBACK (Caso a internet falhe) ---
 const DEFAULT_CASES = [
   {
     id: 1,
     client: "Carlos Silva",
-    phone: "11999999999",
+    phone: "(11) 99999-9999",
     title: "Ação de Indenização vs Banco X",
     status: "Em Andamento",
     stage: "analise_juiz",
     anxietyScore: 85, 
     lastUpdate: "Há 2 dias",
-    timeline: []
+    timeline: [
+      { id: 1, title: "Petição Inicial", date: "10/01/2024", completed: true, desc: "Enviamos o seu pedido ao juiz." },
+      { id: 2, title: "Citação do Réu", date: "15/01/2024", completed: true, desc: "O Banco foi notificado do processo." },
+      { id: 3, title: "Análise do Juiz", date: "Hoje", completed: false, current: true, desc: "O juiz está analisando nossos argumentos. Isso demora em média 20 dias." },
+      { id: 4, title: "Audiência", date: "Pendente", completed: false, desc: "Reunião para ouvir testemunhas." },
+      { id: 5, title: "Sentença", date: "Pendente", completed: false, desc: "Decisão final do juiz." }
+    ]
   }
 ];
 
@@ -65,7 +72,7 @@ const DEFAULT_LEADS = [
 ];
 
 const DEFAULT_MESSAGES = [
-  { id: 1, text: "Olá! Vi que acessou o portal. Tem alguma dúvida?", sender: 'bot', time: '10:30' }
+  { id: 1, text: "Olá Carlos! Vi que acessou o portal. Tem alguma dúvida sobre a etapa atual?", sender: 'bot', time: '10:30' }
 ];
 
 const DEFAULT_DOCUMENTS = [
@@ -74,9 +81,10 @@ const DEFAULT_DOCUMENTS = [
 
 const DEFAULT_FINANCIALS = [
   { id: 1, title: "Honorários Iniciais", client: "Carlos Silva", amount: 2500.00, dueDate: "2024-01-10", status: "Pago", type: "Pix" },
+  { id: 2, title: "Parcela 2/10", client: "Carlos Silva", amount: 500.00, dueDate: "2024-02-10", status: "Atrasado", type: "Boleto" }
 ];
 
-// --- HOOKS DE PERSISTÊNCIA ---
+// --- HOOKS DE PERSISTÊNCIA LOCAL (Para Leads e Docs na Fase 1) ---
 const useStickyState = (defaultValue, key) => {
   const [value, setValue] = useState(() => {
     const stickyValue = window.localStorage.getItem(key);
@@ -88,8 +96,7 @@ const useStickyState = (defaultValue, key) => {
   return [value, setValue];
 };
 
-// --- FUNÇÕES UTILITÁRIAS GLOBAIS (DRY - Don't Repeat Yourself) ---
-
+// --- FUNÇÕES UTILITÁRIAS GLOBAIS ---
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
@@ -103,7 +110,7 @@ const formatDate = (dateString) => {
   return dateString;
 };
 
-// 🚀 BUG CORRIGIDO: Máscara de Telefone à prova de falhas usando RegEx puro
+// Máscaras de Input Seguras
 const applyPhoneMask = (value) => {
   let v = value.replace(/\D/g, ''); 
   if (v.length <= 2) return v.replace(/(\d{2})/, '($1');
@@ -111,7 +118,6 @@ const applyPhoneMask = (value) => {
   return v.replace(/(\d{2})(\d{5})(\d{1,4})/, '($1) $2-$3').slice(0, 15);
 };
 
-// 🚀 NOVA MÁSCARA: Validação visual para CPF
 const applyCpfMask = (value) => {
   let v = value.replace(/\D/g, '');
   if (v.length <= 3) return v;
@@ -172,7 +178,7 @@ const LoginPage = ({ onLogin }) => {
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Corporativo</label>
               <input 
                 type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="renzo@advocacia.com.br"
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="advogado@lopes.pt"
               />
             </div>
             <div>
@@ -198,9 +204,11 @@ const LoginPage = ({ onLogin }) => {
 // ============================================================================
 // 1. LANDING PAGE (SITE PÚBLICO)
 // ============================================================================
+// NOTA: Este componente está mantido no código, mas a rota de acesso
+// foi comentada no roteador principal no final do arquivo.
 const LandingPage = ({ onNavigate, onAddLead }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', phone: '', type: 'Usucapião' });
+  const [formData, setFormData] = useState({ name: '', phone: '', type: 'Cível' });
   const [showNotification, setShowNotification] = useState(false);
 
   const handleSubmit = (e) => {
@@ -211,7 +219,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
       return;
     }
     onAddLead({ id: Date.now(), name: formData.name, phone: formData.phone, type: formData.type, status: "Novo", date: "Agora mesmo" });
-    setFormData({ name: '', phone: '', type: 'Usucapião' });
+    setFormData({ name: '', phone: '', type: 'Cível' });
     setIsModalOpen(false);
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 4000);
@@ -250,9 +258,8 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Caso</label>
               <select className="w-full p-3 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-                <option value="Usucapião">Usucapião (Imobiliário)</option>
-                <option value="Trabalhista">Trabalhista</option>
                 <option value="Cível">Cível / Consumidor</option>
+                <option value="Trabalhista">Trabalhista</option>
                 <option value="Família">Família (Divórcio/Pensão)</option>
                 <option value="Empresarial">Empresarial</option>
               </select>
@@ -302,8 +309,10 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
 };
 
 // ============================================================================
-// 2. PORTAL DO CLIENTE
+// 2. PORTAL DO CLIENTE (ÁREA EXCLUSIVA)
 // ============================================================================
+// NOTA: Este componente está mantido no código, mas a rota de acesso
+// foi comentada no roteador principal no final do arquivo.
 const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials }) => {
   const [chatOpen, setChatOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -314,6 +323,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
   const [showNotification, setShowNotification] = useState(false);
   const chatEndRef = useRef(null);
 
+  // Filtra faturas apenas do cliente logado (Demo: Carlos Silva)
   const { myFinancials, totalPendente } = useMemo(() => {
     if (!caseData) return { myFinancials: [], totalPendente: 0 };
     const filtered = financials.filter(f => f.client === caseData.client || f.client === "Carlos Silva");
@@ -332,8 +342,8 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     setTimeout(() => {
       setIsUploading(false);
       setUploadOpen(false);
-      onUploadDocument({ name: "Documento_Carlos_Silva.pdf", client: caseData.client });
-      onNotifyLawyer("Novo Documento Recebido de Carlos Silva.");
+      onUploadDocument({ name: "Documento_Cliente.pdf", client: caseData?.client });
+      onNotifyLawyer("Novo Documento Recebido pelo Portal.");
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
     }, 2000);
@@ -347,7 +357,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     setTimeout(() => {
       setIsTyping(false);
       onSendMessage("Anotado! Notifiquei o advogado para que ele analise assim que possível.", 'bot');
-      onNotifyLawyer("Mensagem de Carlos Silva no chat.");
+      onNotifyLawyer("Mensagem de Cliente no chat do Portal.");
     }, 1500);
   };
 
@@ -355,7 +365,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
       <Activity className="w-12 h-12 mb-4 text-slate-300 animate-spin" />
       <p>Aguardando dados da nuvem...</p>
-      <button onClick={() => onNavigate('landing')} className="mt-4 text-indigo-600 font-bold hover:underline">Voltar</button>
+      <button onClick={() => onNavigate('login')} className="mt-4 text-indigo-600 font-bold hover:underline">Voltar</button>
     </div>
   );
 
@@ -368,7 +378,8 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
         </div>
       )}
 
-      <Modal isOpen={financialOpen} onClose={() => setFinancialOpen(false)} title="Financeiro">
+      {/* MODAL FINANCEIRO DO CLIENTE */}
+      <Modal isOpen={financialOpen} onClose={() => setFinancialOpen(false)} title="Meu Financeiro">
         <div className="space-y-4">
           <div className="bg-indigo-50 p-4 rounded-lg flex justify-between items-center mb-4 border border-indigo-100">
              <span className="text-sm font-bold text-indigo-900">Total Pendente</span>
@@ -377,7 +388,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
              </span>
           </div>
           <div className="space-y-3">
-             {myFinancials.map(fin => (
+             {myFinancials.length > 0 ? myFinancials.map(fin => (
                <div key={fin.id} className="border border-slate-200 rounded-lg p-3 flex justify-between items-center bg-white shadow-sm">
                  <div>
                    <div className="font-bold text-slate-800 text-sm tracking-tight">{fin.title}</div>
@@ -390,11 +401,12 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
                    </span>
                  </div>
                </div>
-             ))}
+             )) : <p className="text-xs text-center text-slate-400">Nenhuma fatura encontrada.</p>}
           </div>
         </div>
       </Modal>
 
+      {/* MODAL UPLOAD CLIENTE */}
       <Modal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} title="Enviar Documento">
         {!isUploading ? (
           <div className="space-y-6">
@@ -413,6 +425,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
         )}
       </Modal>
 
+      {/* CHAT DO PORTAL */}
       {chatOpen && (
         <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-up md:max-w-md md:right-4 md:left-auto md:bottom-4 md:top-auto md:h-[600px] md:shadow-2xl md:rounded-2xl border-slate-200">
           <div className="bg-indigo-900 text-white p-4 flex justify-between items-center md:rounded-t-2xl">
@@ -440,9 +453,10 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
         </div>
       )}
 
+      {/* HEADER DO PORTAL */}
       <div className={`${TENANT_CONFIG.primaryColor} text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg`}>
         <div className="flex justify-between items-center mb-8">
-           <button onClick={() => onNavigate('landing')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ArrowRight className="w-5 h-5 rotate-180" /></button>
+           <button onClick={() => onNavigate('login')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ArrowRight className="w-5 h-5 rotate-180" /></button>
            <span className="font-bold text-[10px] uppercase tracking-[0.2em] opacity-70">Painel do Cliente</span>
            <div className="relative"><Bell className="w-5 h-5 opacity-70" /><div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900"></div></div>
         </div>
@@ -462,7 +476,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
              <div className="relative z-10">
                <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Ação Cível</span>
                <h2 className="text-lg font-bold text-slate-800 mt-2 leading-tight tracking-tight">{caseData.title}</h2>
-               <p className="text-[10px] text-slate-400 mt-1 font-mono tracking-tighter">PROC. 00123.45.2024.BR</p>
+               <p className="text-[10px] text-slate-400 mt-1 font-mono tracking-tighter">PROC. {caseData.id.toString().slice(0,8)}</p>
              </div>
              <Activity className="w-5 h-5 text-green-500 animate-pulse" />
            </div>
@@ -472,27 +486,28 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
            </div>
         </div>
 
+        {/* TIMELINE DO PROCESSO */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-sm"><Clock className="w-4 h-4 text-indigo-600" /> Histórico de Etapas</h3>
           <div className="space-y-8 relative">
             <div className="absolute left-[11px] top-2 bottom-4 w-[2px] bg-slate-100"></div>
-            {caseData.timeline && caseData.timeline.map((step) => (
+            {caseData.timeline && caseData.timeline.length > 0 ? caseData.timeline.map((step) => (
               <div key={step.id} className="relative z-10 flex gap-4">
-                <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center bg-white transition-all duration-500 ${step.completed ? 'border-green-500 text-green-500 bg-green-50/50' : step.current || step.isCurrent ? 'border-indigo-600 text-indigo-600 ring-4 ring-indigo-50' : 'border-slate-200'}`}>
-                  {step.completed ? <CheckCircle className="w-3 h-3 fill-current" /> : step.current || step.isCurrent ? <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div> : null}
+                <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center bg-white transition-all duration-500 ${step.completed ? 'border-green-500 text-green-500 bg-green-50/50' : step.isCurrent ? 'border-indigo-600 text-indigo-600 ring-4 ring-indigo-50' : 'border-slate-200'}`}>
+                  {step.completed ? <CheckCircle className="w-3 h-3 fill-current" /> : step.isCurrent ? <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div> : null}
                 </div>
-                <div className={`${step.current || step.isCurrent ? 'opacity-100' : 'opacity-60'}`}>
+                <div className={`${step.isCurrent || step.completed ? 'opacity-100' : 'opacity-60'}`}>
                   <h4 className="font-bold text-slate-800 text-sm tracking-tight">{step.title}</h4>
                   <span className="text-[10px] text-slate-400 font-bold block mb-1">{step.date}</span>
-                  <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.description || step.desc}</p>
+                  <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.description || step.desc || "Aguardando atualização..."}</p>
                 </div>
               </div>
-            ))}
+            )) : <p className="text-xs text-slate-400 text-center">Nenhum histórico registrado ainda.</p>}
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => setChatOpen(true)} className="p-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 flex flex-col items-center gap-2 text-xs transition active:scale-95"><MessageSquare className="w-5 h-5" /> Falar com {TENANT_CONFIG.advogado}</button>
+          <button onClick={() => setChatOpen(true)} className="p-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 flex flex-col items-center gap-2 text-xs transition active:scale-95"><MessageSquare className="w-5 h-5" /> Falar com Advogado</button>
           <button onClick={() => setFinancialOpen(true)} className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 text-xs hover:border-indigo-500 transition active:scale-95"><DollarSign className="w-5 h-5 text-green-600" /> Ver Pagamentos</button>
         </div>
         <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5 text-indigo-500" /> Enviar Arquivo Digital</button>
@@ -501,18 +516,21 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
   );
 };
 
+
 // ============================================================================
-// 3. PAINEL DO ADVOGADO
+// 3. PAINEL DO ADVOGADO (DASHBOARD COMPLETO E ATIVO)
 // ============================================================================
 const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead }) => {
   const [activeTab, setActiveTab] = useState('kanban');
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // OTIMIZAÇÃO: useMemo para não recalcular clientes a cada digitação
   const activeClients = useMemo(() => {
     return Array.from(new Set(cases.map(c => typeof c.client === 'object' ? c.client?.name : c.client))).filter(Boolean);
   }, [cases]);
 
+  // OTIMIZAÇÃO: useMemo para cálculos financeiros 
   const { totalRevenue, openRevenue, lateRevenue } = useMemo(() => {
     return {
       totalRevenue: financials.filter(f => f.status === 'Pago').reduce((acc, curr) => acc + curr.amount, 0),
@@ -521,20 +539,23 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     };
   }, [financials]);
 
+  // OTIMIZAÇÃO: Agrupamento Kanban único
   const groupedCases = useMemo(() => ({
     peticao: cases.filter(c => c.stage === 'peticao'),
     analise_juiz: cases.filter(c => c.stage === 'analise_juiz'),
     sentenca: cases.filter(c => c.stage === 'sentenca')
   }), [cases]);
 
+  // Estados dos Modais
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
   const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
 
-  // 🚀 ATUALIZADO: Agora suporta CPF na criação do processo
+  // Estados dos Formulários com CPF
   const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '' });
   const [newDocData, setNewDocData] = useState({ name: '', client: '' });
   
+  // Estado Inteligente para o Financeiro
   const [newFinData, setNewFinData] = useState({ client: '', amount: '', dueDate: '', type: 'Boleto' });
   const [finChargeType, setFinChargeType] = useState('Honorários Iniciais');
   const [finTotalInstallments, setFinTotalInstallments] = useState(10);
@@ -574,7 +595,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       onUpdateLead(lead.id, 'Contatado');
     }
     const phoneDigits = lead.phone.replace(/\D/g, '');
-    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como o ${TENANT_CONFIG.advogado} pode te ajudar hoje?`;
+    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como podemos te ajudar hoje?`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
     
@@ -610,7 +631,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
   const handleAddNewFin = (e) => {
     e.preventDefault();
-    
     if (!newFinData.client) {
       setNotification({ title: "Atenção", message: "Selecione um cliente da lista.", type: "warning" });
       setTimeout(() => setNotification(null), 4000);
@@ -671,7 +691,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </div>
       )}
 
-      {/* 🚀 ATUALIZADO: Modal Novo Processo agora pede CPF */}
+      {/* Modal Novo Processo com CPF */}
       <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Cadastrar Novo Processo (Nuvem)">
         <form onSubmit={handleAddNewCase} className="space-y-4">
           <div>
@@ -698,7 +718,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </form>
       </Modal>
 
-      {/* Modal Nova Fatura */}
+      {/* Modal Nova Fatura Inteligente */}
       <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura (Nuvem)">
         <form onSubmit={handleAddNewFin} className="space-y-4">
           <div>
@@ -799,6 +819,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         />
       )}
 
+      {/* SIDEBAR DO ADVOGADO */}
       <aside className={`fixed md:relative z-[70] h-full w-64 bg-slate-900 text-slate-300 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <div className="p-6 md:p-8 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -815,7 +836,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Documentação</span></button>
           <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controle Financeiro</span></button>
         </nav>
-        <div className="p-6 border-t border-slate-800"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold hover:text-white transition opacity-60 hover:bg-red-500/10 hover:text-red-400 hover:opacity-100"><LogOut className="w-4 h-4" /> Sair da Plataforma</button></div>
+        <div className="p-6 border-t border-slate-800"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold hover:text-white transition opacity-60 hover:bg-red-500/10 hover:text-red-400 hover:opacity-100"><LogOut className="w-4 h-4" /> Sair do Sistema</button></div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden w-full">
@@ -826,7 +847,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div className="flex items-center gap-4 md:gap-6">
             
-            {/* BOTÃO MÁGICO DINÂMICO DE ACORDO COM A ABA ATUAL */}
+            {/* BOTÕES DE AÇÃO DINÂMICOS */}
             {activeTab === 'kanban' && (
               <button onClick={() => setIsAddCaseModalOpen(true)} className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Processo</span>
@@ -845,7 +866,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
             <div className="hidden md:flex flex-col text-right border-l pl-6 border-slate-200">
               <span className="text-sm font-extrabold text-slate-800">{TENANT_CONFIG.advogado}</span>
-              <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">Advogado Senior</span>
+              <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">Acesso Seguro</span>
             </div>
             <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg border-2 border-slate-800 shadow-sm">
               {TENANT_CONFIG.advogado.substring(4, 6).toUpperCase()}
@@ -853,6 +874,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
         </header>
 
+        {/* ÁREA DE CONTEÚDO DAS ABAS */}
         <div className="flex-1 overflow-auto p-4 md:p-10 bg-slate-50/50 pb-24 md:pb-10">
           {activeTab === 'finance' ? (
             <div className="animate-fade-in space-y-6 md:space-y-10">
@@ -876,6 +898,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                            <td className="p-4 md:p-8"><span className={`px-3 md:px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase tracking-tight ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{fin.status}</span></td>
                            <td className="p-4 md:p-8 text-right">{fin.status !== 'Pago' && <button onClick={() => handlePay(fin.id)} className="bg-white text-green-600 font-extrabold hover:bg-green-600 hover:text-white px-3 md:px-5 py-2 rounded-xl border-2 border-green-500/20 text-[10px] transition-all duration-300 shadow-sm hover:shadow-green-500/20">Liquidar</button>}</td>
                          </tr>
+                         
                        ))}
                      </tbody>
                    </table>
@@ -933,14 +956,14 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
                 
                 {/* O Bloco de Processos em Carteira */}
-                <div onClick={() => setNotification({ title: "Processos Ativos", message: `Você tem ${cases.length} processos sendo geridos no momento.`, type: "info" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
+                <div className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-indigo-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
                   <div className="text-[9px] md:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Processos em Carteira</div>
                   <div className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tighter">{cases.length}</div>
                 </div>
                 
                 {/* O Bloco de Estatística de Ansiedade */}
-                <div onClick={() => setNotification({ title: "Alerta de Ansiedade", message: `Existem ${cases.filter(c => c.anxietyScore > 70).length} clientes que precisam de atenção. Role para baixo e veja os alertas vermelhos.`, type: "warning" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
+                <div className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
                    <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-red-50 rounded-bl-full group-hover:scale-125 transition duration-700 opacity-60 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-red-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
                      Índice de Ansiedade <AlertTriangle className="w-3 h-3" />
@@ -958,7 +981,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                 </div>
 
                 {/* O Bloco de Eficiência */}
-                <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema gerou 8.4 mil ações automáticas neste mês, poupando tempo valioso da sua equipe.", type: "success" })} className="cursor-pointer bg-indigo-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500">
+                <div className="cursor-pointer bg-indigo-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500">
                    <div className="text-[9px] md:text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Eficiência</div>
                    <div className="text-3xl md:text-5xl font-extrabold text-white tracking-tighter">8.4k</div>
                    <p className="text-[8px] md:text-[9px] text-indigo-400 mt-2 md:mt-3 font-extrabold uppercase tracking-wider">Avisos Proativos</p>
@@ -1036,108 +1059,77 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   );
 };
 
+
 // ============================================================================
-// --- APP CONTROLLER PRINCIPAL ---
+// --- APP CONTROLLER PRINCIPAL (CONEXÃO REAL COM A NUVEM) ---
 // ============================================================================
 export default function App() {
+  // 🚀 FORÇA O INÍCIO NO LOGIN PARA BLOQUEAR ACESSO PÚBLICO
   const [currentView, setCurrentView] = useState('login'); 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loadingData, setLoadingData] = useState(false);
   
-  // Dados agora vindos da nuvem
+  // Estados Globais
   const [cases, setCases] = useState([]);
   const [financials, setFinancials] = useState([]);
-  
-  // Módulos ainda locais para MVP
   const [leads, setLeads] = useStickyState(DEFAULT_LEADS, 'pascale_leads');
   const [messages, setMessages] = useStickyState(DEFAULT_MESSAGES, 'pascale_messages');
   const [documents, setDocuments] = useStickyState(DEFAULT_DOCUMENTS, 'pascale_documents');
   const [globalNotifications, setGlobalNotifications] = useState([]);
 
-  // 📡 1. BUSCAR DADOS (Cases e Financials) DA NUVEM
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        console.log("📡 Conectando à base de dados na Nuvem...");
-        
-        // Fetch de Processos
-        const casesRes = await fetch(`${API_URL}/cases`);
-        if (casesRes.ok) {
-          const casesData = await casesRes.json();
-          if (casesData && casesData.length > 0) {
-            setCases(casesData.map(dbCase => ({
-              ...dbCase,
-              client: dbCase.client ? dbCase.client.name : 'Cliente Desconhecido',
-              phone: dbCase.client ? dbCase.client.phone : '',
-              lastUpdate: "Sincronizado",
-              timeline: dbCase.timeline || []
-            })));
-          } else {
-            setCases(DEFAULT_CASES);
-          }
-        }
-
-        // Fetch de Financeiro
-        const finRes = await fetch(`${API_URL}/financials`);
-        if (finRes.ok) {
-          const finData = await finRes.json();
-          if (finData && finData.length > 0) {
-             setFinancials(finData.map(dbFin => ({
-               ...dbFin,
-               client: dbFin.client ? dbFin.client.name : 'Cliente Desconhecido'
-             })));
-          } else {
-             setFinancials(DEFAULT_FINANCIALS);
-          }
-        }
-
-      } catch (error) {
-        console.warn("⚠️ Servidor API inacessível. Ativando MODO DEMO offline.");
-        setCases(DEFAULT_CASES);
-        setFinancials(DEFAULT_FINANCIALS);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  // 📡 2. GRAVAR DADOS E MOVER FASE (NUVEM)
-  const moveCase = async (caseId) => {
-    setCases(prev => prev.map(c => {
-      if (c.id === caseId) {
-        const newStage = c.stage === 'peticao' ? 'analise_juiz' : 'sentenca';
-        return { ...c, stage: newStage, status: newStage === 'sentenca' ? 'Concluído' : 'Em Andamento', lastUpdate: 'Agora mesmo' };
-      }
-      return c;
-    }));
-    
+  // 📡 FETCH DA NUVEM (Só roda quando o advogado faz login)
+  const fetchCloudData = async () => {
+    setLoadingData(true);
     try {
-      await fetch(`${API_URL}/cases/${caseId}/move`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stage: 'sentenca', status: 'Concluído' })
-      });
+      const resCases = await fetch(`${API_URL}/cases`);
+      if (resCases.ok) {
+        const data = await resCases.json();
+        if (data.length > 0) {
+          setCases(data.map(dbCase => ({
+            id: dbCase.id,
+            title: dbCase.title,
+            status: dbCase.status,
+            stage: dbCase.stage,
+            client: dbCase.client?.name || 'Cliente Sem Nome',
+            cpf: dbCase.client?.cpf || '',
+            phone: dbCase.client?.phone || '',
+            lastUpdate: 'Sincronizado',
+            timeline: dbCase.timeline || []
+          })));
+        } else {
+          setCases(DEFAULT_CASES);
+        }
+      }
+      
+      const resFin = await fetch(`${API_URL}/financials`);
+      if (resFin.ok) {
+        const fData = await resFin.json();
+        if (fData.length > 0) {
+          setFinancials(fData.map(dbFin => ({ ...dbFin, client: dbFin.client?.name })));
+        } else {
+          setFinancials(DEFAULT_FINANCIALS);
+        }
+      }
     } catch (e) {
-      console.error("Erro ao gravar mudança:", e);
+      console.warn("Servidor API não alcançável. Usando modo offline.", e);
+      setCases(DEFAULT_CASES);
+      setFinancials(DEFAULT_FINANCIALS);
+    } finally {
+      setLoadingData(false);
     }
   };
 
-  // ➕ 3. NOVO PROCESSO E CLIENTE COMPLETO (ENVIAR PARA A NUVEM)
-  const addCase = async (newCaseData) => {
+  useEffect(() => {
+    if (isAuthenticated && currentView === 'dashboard') {
+      fetchCloudData();
+    }
+  }, [isAuthenticated, currentView]);
+
+  // ➕ POST: CRIAR NOVO PROCESSO NA NUVEM
+  const addCaseToCloud = async (newCaseData) => {
     const tempId = Date.now().toString();
-    const novoProcesso = {
-      id: tempId, 
-      client: newCaseData.client,
-      phone: newCaseData.phone,
-      title: newCaseData.title,
-      status: "Novo",
-      stage: "peticao", 
-      anxietyScore: 0,
-      lastUpdate: "Aguardando sincronização...",
-      timeline: []
-    };
-    setCases(prev => [novoProcesso, ...prev]);
+    const temporaryCase = { id: tempId, stage: 'peticao', status: 'Novo', lastUpdate: 'A gravar...', timeline: [], ...newCaseData };
+    setCases(prev => [temporaryCase, ...prev]);
 
     try {
       const response = await fetch(`${API_URL}/cases`, {
@@ -1145,107 +1137,91 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCaseData)
       });
-      if (!response.ok) throw new Error('Falha ao salvar processo');
-      const dbCase = await response.json();
       
-      setCases(prev => prev.map(c => c.id === tempId ? {
-        ...dbCase,
-        client: dbCase.client?.name || newCaseData.client,
-        phone: dbCase.client?.phone || newCaseData.phone,
-        lastUpdate: "Sincronizado na Nuvem",
-        timeline: dbCase.timeline || []
-      } : c));
+      if (response.ok) {
+        fetchCloudData(); 
+      }
     } catch (e) {
-      console.error("Erro ao enviar novo processo para API:", e);
+      console.error("Erro de rede ao salvar processo:", e);
     }
   };
 
-  // ➕ 4. NOVA FATURA FINANCEIRA (ENVIAR PARA A NUVEM)
+  // 🔄 PATCH: MOVER PROCESSO NA NUVEM
+  const moveCaseInCloud = async (caseId, currentStage) => {
+    const newStage = currentStage === 'peticao' ? 'analise_juiz' : 'sentenca';
+    const newStatus = newStage === 'sentenca' ? 'Concluído' : 'Em Andamento';
+
+    setCases(prev => prev.map(c => c.id === caseId ? { ...c, stage: newStage, status: newStatus } : c));
+
+    try {
+      await fetch(`${API_URL}/cases/${caseId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage, status: newStatus })
+      });
+    } catch (e) {
+      console.error("Erro ao mover:", e);
+    }
+  };
+
+  // ➕ POST: NOVA FATURA
   const handleAddFinancial = async (finData) => {
     const tempId = Date.now().toString();
-    const newFin = {
-      id: tempId,
-      title: finData.title,
-      client: finData.client,
-      amount: parseFloat(finData.amount),
-      dueDate: finData.dueDate,
-      status: "Aberto",
-      type: finData.type
-    };
+    const newFin = { ...finData, id: tempId, status: "Aberto" };
     setFinancials(prev => [newFin, ...prev]);
 
     try {
-      const response = await fetch(`${API_URL}/financials`, {
+      await fetch(`${API_URL}/financials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finData)
       });
-      if (!response.ok) throw new Error('Erro ao salvar fatura (O cliente já existe?)');
-      const dbFin = await response.json();
-
-      setFinancials(prev => prev.map(f => f.id === tempId ? { ...f, id: dbFin.id } : f));
+      fetchCloudData();
     } catch (e) {
       console.error("Erro ao enviar fatura para API:", e);
     }
   };
 
-  const addLead = async (newLead) => {
-    setLeads(prev => [newLead, ...prev]); 
-    try {
-      await fetch(`${API_URL}/leads`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newLead.name, phone: newLead.phone, type: newLead.type })
-      });
-    } catch (e) { console.error("Erro ao enviar Lead", e); }
-  };
-
-  // Funções Locais Restantes
+  // Funções Locais Complementares
+  const addLead = (newLead) => setLeads(prev => [newLead, ...prev]);
   const updateLeadStatus = (id, newStatus) => setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+  const updateFinancial = (id, newStatus) => setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
   const handleSendMessage = (text, sender) => setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
   const handleUploadDocument = (docData) => setDocuments(prev => [{ id: Date.now(), name: docData.name, client: docData.client, date: "Hoje", size: "1.5 MB" }, ...prev]);
-  const updateFinancial = (id, newStatus) => setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
   const notifyLawyer = (message) => setGlobalNotifications(prev => [...prev, message]);
 
-  // ROTAS INTERNAS
+  // 🚀 ROTEADOR FECHADO PARA PRODUÇÃO
   const renderView = () => {
-    switch(currentView) {
-      case 'landing': return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} />;
-      case 'portal': return <ClientPortal onNavigate={setCurrentView} caseData={cases[0]} onNotifyLawyer={notifyLawyer} messages={messages} onSendMessage={handleSendMessage} onUploadDocument={handleUploadDocument} financials={financials} />;
-      case 'login': return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
-      case 'dashboard': 
-        if (!isAuthenticated) return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
-        return <LawyerDashboard 
-          onNavigate={setCurrentView} 
-          cases={cases} 
-          onMoveCase={moveCase} 
-          onAddCase={addCase} 
-          leads={leads} 
-          documents={documents} 
-          financials={financials} 
-          onUpdateFinancial={updateFinancial} 
-          onAddFinancial={handleAddFinancial}
-          onAddDocument={handleUploadDocument}
-          globalNotifications={globalNotifications} 
-          onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} 
-          onUpdateLead={updateLeadStatus} 
-        />;
-      default: return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
+    
+    // Área logada do Advogado
+    if (currentView === 'dashboard' && isAuthenticated) {
+      if (loadingData) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
+            <Activity className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
+            <p className="font-extrabold uppercase text-xs animate-pulse text-indigo-200">A Sincronizar com a Nuvem...</p>
+          </div>
+        );
+      }
+      return <LawyerDashboard cases={cases} onMoveCase={(id) => moveCaseInCloud(id, cases.find(c=>c.id===id)?.stage)} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} onAddFinancial={handleAddFinancial} onAddDocument={handleUploadDocument} globalNotifications={globalNotifications} onLogout={() => { setIsAuthenticated(false); setCurrentView('login'); }} onUpdateLead={updateLeadStatus} />;
     }
+
+    // --- CÓDIGO MANTIDO MAS COMENTADO (FASE 2) ---
+    /*
+    if (currentView === 'portal') {
+      return <ClientPortal onNavigate={setCurrentView} caseData={cases[0]} onNotifyLawyer={notifyLawyer} messages={messages} onSendMessage={handleSendMessage} onUploadDocument={handleUploadDocument} financials={financials} />;
+    }
+    if (currentView === 'landing') {
+      return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} />;
+    }
+    */
+
+    // Se tentar aceder a qualquer outra coisa ou não estiver logado, cai no Login.
+    return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
   };
 
-  // TELA DE CARREGAMENTO DO BANCO DE DADOS
-  if (loadingData && isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
-        <Activity className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
-        <p className="font-extrabold tracking-widest uppercase text-xs animate-pulse text-indigo-200">Sincronizando com a Nuvem...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900 pb-20 md:pb-0">
+    <div className="antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900">
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -1257,6 +1233,16 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
       `}</style>
+      
+      {/* --- BARRA DE CONTROLO MASTER COMENTADA (FASE 2) --- */}
+      {/* <div className="fixed bottom-3 md:bottom-6 left-3 md:left-6 right-3 md:right-auto z-[200] bg-slate-950/90 backdrop-blur-2xl text-white px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[2rem] shadow-2xl flex justify-center md:justify-start gap-2 md:gap-8 text-[9px] md:text-[11px] font-extrabold border border-white/10 items-center ring-1 ring-white/20">
+        <span className="hidden md:inline text-slate-600 uppercase tracking-[0.3em] border-r border-slate-800 pr-8 py-1">Controlo Master</span>
+        <button onClick={() => setCurrentView('landing')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'landing' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>1. SITE</button>
+        <button onClick={() => setCurrentView('portal')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'portal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>2. PORTAL</button>
+        <button onClick={() => setCurrentView('dashboard')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'dashboard' || currentView === 'login' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>3. PAINEL</button>
+      </div>
+      */}
+
       {renderView()}
     </div>
   );
