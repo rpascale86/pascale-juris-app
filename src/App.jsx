@@ -147,12 +147,10 @@ const formatCurrency = (value) => {
 // FUNÇÃO NOVA: Formatar data do padrão internacional (AAAA-MM-DD) para brasileiro (DD/MM/AAAA)
 const formatDate = (dateString) => {
   if (!dateString) return '';
-  // Se vier com hífen (padrão do input date), inverte. Ex: "2026-03-04" -> "04/03/2026"
   if (dateString.includes('-')) {
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
   }
-  // Se já vier com barra ou outro formato, devolve como está
   return dateString;
 };
 
@@ -213,7 +211,7 @@ const LoginPage = ({ onLogin }) => {
 };
 
 // ============================================================================
-// 1. LANDING PAGE (SITE PÚBLICO) - Restaurado na Íntegra
+// 1. LANDING PAGE (SITE PÚBLICO)
 // ============================================================================
 const LandingPage = ({ onNavigate, onAddLead }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -328,7 +326,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
 };
 
 // ============================================================================
-// 2. PORTAL DO CLIENTE - Restaurado na Íntegra
+// 2. PORTAL DO CLIENTE
 // ============================================================================
 const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials }) => {
   const [chatOpen, setChatOpen] = useState(false);
@@ -402,6 +400,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
                <div key={fin.id} className="border border-slate-200 rounded-lg p-3 flex justify-between items-center bg-white shadow-sm">
                  <div>
                    <div className="font-bold text-slate-800 text-sm tracking-tight">{fin.title}</div>
+                   {/* DATA FORMATADA AQUI */}
                    <div className="text-[10px] text-slate-400">Vencimento: {formatDate(fin.dueDate)}</div>
                  </div>
                  <div className="text-right">
@@ -813,6 +812,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <tr key={fin.id} className="hover:bg-slate-50/50 transition duration-300">
                            <td className="p-4 md:p-8 font-bold text-slate-800">{fin.title}</td>
                            <td className="p-4 md:p-8 text-slate-600 font-medium">{fin.client}</td>
+                           {/* DATA FORMATADA AQUI TAMBÉM */}
                            <td className="p-4 md:p-8 text-slate-500 font-medium">{formatDate(fin.dueDate)}</td>
                            <td className="p-4 md:p-8 font-extrabold text-slate-800">{formatCurrency(fin.amount)}</td>
                            <td className="p-4 md:p-8"><span className={`px-3 md:px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase tracking-tight ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{fin.status}</span></td>
