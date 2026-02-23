@@ -546,10 +546,12 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     sentenca: cases.filter(c => c.stage === 'sentenca')
   }), [cases]);
 
-  // Estados dos Modais
+  // Estados dos Modais e Loading
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
   const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
+  const [isSavingCase, setIsSavingCase] = useState(false);
+  const [isSavingFin, setIsSavingFin] = useState(false);
 
   // Estados dos Formulários com CPF
   const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '' });
@@ -612,9 +614,9 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     setTimeout(() => setNotification(null), 7000);
   };
 
-  // --- FUNÇÕES DE SUBMISSÃO DOS FORMULÁRIOS ---
+  // --- FUNÇÕES DE SUBMISSÃO COM LOADING REAL (SEM EFEITO FANTASMA) ---
 
-  const handleAddNewCase = (e) => {
+  const handleAddNewCase = async (e) => {
     e.preventDefault();
     const rawPhone = newCaseData.phone.replace(/\D/g, '');
     if (rawPhone.length < 10) {
@@ -622,14 +624,24 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       setTimeout(() => setNotification(null), 4000);
       return; 
     }
-    onAddCase(newCaseData);
-    setIsAddCaseModalOpen(false);
-    setNewCaseData({ client: '', cpf: '', phone: '', title: '' });
-    setNotification({ title: "Processo Cadastrado", message: "Enviado para a Nuvem com sucesso.", type: "success" });
-    setTimeout(() => setNotification(null), 3000);
+
+    setIsSavingCase(true); // Gira o loading
+    const result = await onAddCase(newCaseData); // Espera a nuvem responder
+    setIsSavingCase(false); // Para o loading
+
+    if (result && result.success === false) {
+      // MOSTRA O ERRO EXATO DA API
+      setNotification({ title: "Falha ao Salvar", message: result.error, type: "warning" });
+      setTimeout(() => setNotification(null), 6000);
+    } else {
+      setIsAddCaseModalOpen(false);
+      setNewCaseData({ client: '', cpf: '', phone: '', title: '' });
+      setNotification({ title: "Processo Cadastrado", message: "Gravado na Nuvem com sucesso.", type: "success" });
+      setTimeout(() => setNotification(null), 3000);
+    }
   };
 
-  const handleAddNewFin = (e) => {
+  const handleAddNewFin = async (e) => {
     e.preventDefault();
     if (!newFinData.client) {
       setNotification({ title: "Atenção", message: "Selecione um cliente da lista.", type: "warning" });
@@ -644,17 +656,23 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       finalTitle = finCustomTitle;
     }
 
-    onAddFinancial({ ...newFinData, title: finalTitle });
-    
-    setIsAddFinModalOpen(false);
-    setNewFinData({ client: '', amount: '', dueDate: '', type: 'Boleto' });
-    setFinChargeType('Honorários Iniciais');
-    setFinCurrentInstallment(1);
-    setFinTotalInstallments(10);
-    setFinCustomTitle('');
-    
-    setNotification({ title: "Fatura Lançada", message: "Gravada no Banco de Dados.", type: "success" });
-    setTimeout(() => setNotification(null), 3000);
+    setIsSavingFin(true); // Loading
+    const result = await onAddFinancial({ ...newFinData, title: finalTitle });
+    setIsSavingFin(false);
+
+    if (result && result.success === false) {
+      setNotification({ title: "Falha ao Lançar", message: result.error, type: "warning" });
+      setTimeout(() => setNotification(null), 6000);
+    } else {
+      setIsAddFinModalOpen(false);
+      setNewFinData({ client: '', amount: '', dueDate: '', type: 'Boleto' });
+      setFinChargeType('Honorários Iniciais');
+      setFinCurrentInstallment(1);
+      setFinTotalInstallments(10);
+      setFinCustomTitle('');
+      setNotification({ title: "Fatura Lançada", message: "Gravada na Nuvem.", type: "success" });
+      setTimeout(() => setNotification(null), 3000);
+    }
   };
 
   const handleAddNewDoc = (e) => {
@@ -712,8 +730,8 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Ação</label>
             <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Usucapião Imóvel X" value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} />
           </div>
-          <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
-            Salvar e Adicionar ao Painel
+          <button type="submit" disabled={isSavingCase} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center ${isSavingCase ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+            {isSavingCase ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Salvar e Adicionar ao Painel"}
           </button>
         </form>
       </Modal>
@@ -779,8 +797,8 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
               <option value="Cartão">Cartão</option>
             </select>
           </div>
-          <button type="submit" className="w-full py-3 mt-4 bg-green-600 text-white rounded-lg font-bold shadow-lg hover:bg-green-700 transition">
-            Lançar Cobrança
+          <button type="submit" disabled={isSavingFin} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center ${isSavingFin ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+            {isSavingFin ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Lançar Cobrança"}
           </button>
         </form>
       </Modal>
@@ -898,7 +916,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                            <td className="p-4 md:p-8"><span className={`px-3 md:px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase tracking-tight ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{fin.status}</span></td>
                            <td className="p-4 md:p-8 text-right">{fin.status !== 'Pago' && <button onClick={() => handlePay(fin.id)} className="bg-white text-green-600 font-extrabold hover:bg-green-600 hover:text-white px-3 md:px-5 py-2 rounded-xl border-2 border-green-500/20 text-[10px] transition-all duration-300 shadow-sm hover:shadow-green-500/20">Liquidar</button>}</td>
                          </tr>
-                         
                        ))}
                      </tbody>
                    </table>
@@ -1125,12 +1142,8 @@ export default function App() {
     }
   }, [isAuthenticated, currentView]);
 
-  // ➕ POST: CRIAR NOVO PROCESSO NA NUVEM
+  // ➕ POST: CRIAR NOVO PROCESSO NA NUVEM COM PROTEÇÃO ANTI-FANTASMA
   const addCaseToCloud = async (newCaseData) => {
-    const tempId = Date.now().toString();
-    const temporaryCase = { id: tempId, stage: 'peticao', status: 'Novo', lastUpdate: 'A gravar...', timeline: [], ...newCaseData };
-    setCases(prev => [temporaryCase, ...prev]);
-
     try {
       const response = await fetch(`${API_URL}/cases`, {
         method: 'POST',
@@ -1139,10 +1152,15 @@ export default function App() {
       });
       
       if (response.ok) {
-        fetchCloudData(); 
+        await fetchCloudData(); // Só mostra na tela depois que o banco de dados confirma
+        return { success: true };
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        return { success: false, error: errData.error || `Erro do Servidor HTTP: ${response.status}` };
       }
     } catch (e) {
       console.error("Erro de rede ao salvar processo:", e);
+      return { success: false, error: "Falha de conexão. A nuvem da Render pode estar a despertar, tente novamente em 30 segundos." };
     }
   };
 
@@ -1151,6 +1169,7 @@ export default function App() {
     const newStage = currentStage === 'peticao' ? 'analise_juiz' : 'sentenca';
     const newStatus = newStage === 'sentenca' ? 'Concluído' : 'Em Andamento';
 
+    // Para movimento de cartões, mantemos a UI otimista por fluidez
     setCases(prev => prev.map(c => c.id === caseId ? { ...c, stage: newStage, status: newStatus } : c));
 
     try {
@@ -1164,21 +1183,25 @@ export default function App() {
     }
   };
 
-  // ➕ POST: NOVA FATURA
+  // ➕ POST: NOVA FATURA COM PROTEÇÃO ANTI-FANTASMA
   const handleAddFinancial = async (finData) => {
-    const tempId = Date.now().toString();
-    const newFin = { ...finData, id: tempId, status: "Aberto" };
-    setFinancials(prev => [newFin, ...prev]);
-
     try {
-      await fetch(`${API_URL}/financials`, {
+      const response = await fetch(`${API_URL}/financials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finData)
       });
-      fetchCloudData();
+      
+      if (response.ok) {
+        await fetchCloudData(); 
+        return { success: true };
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        return { success: false, error: errData.error || `Erro do Servidor HTTP: ${response.status}` };
+      }
     } catch (e) {
       console.error("Erro ao enviar fatura para API:", e);
+      return { success: false, error: "Falha de conexão. A nuvem da Render pode estar a despertar." };
     }
   };
 
