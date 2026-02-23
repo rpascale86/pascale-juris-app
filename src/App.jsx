@@ -144,6 +144,18 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+// FUNÇÃO NOVA: Formatar data do padrão internacional (AAAA-MM-DD) para brasileiro (DD/MM/AAAA)
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  // Se vier com hífen (padrão do input date), inverte. Ex: "2026-03-04" -> "04/03/2026"
+  if (dateString.includes('-')) {
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  // Se já vier com barra ou outro formato, devolve como está
+  return dateString;
+};
+
 // ============================================================================
 // 0. PÁGINA DE LOGIN
 // ============================================================================
@@ -390,7 +402,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
                <div key={fin.id} className="border border-slate-200 rounded-lg p-3 flex justify-between items-center bg-white shadow-sm">
                  <div>
                    <div className="font-bold text-slate-800 text-sm tracking-tight">{fin.title}</div>
-                   <div className="text-[10px] text-slate-400">Vencimento: {fin.dueDate}</div>
+                   <div className="text-[10px] text-slate-400">Vencimento: {formatDate(fin.dueDate)}</div>
                  </div>
                  <div className="text-right">
                    <div className="font-bold text-slate-800 text-sm">{formatCurrency(fin.amount)}</div>
@@ -801,7 +813,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <tr key={fin.id} className="hover:bg-slate-50/50 transition duration-300">
                            <td className="p-4 md:p-8 font-bold text-slate-800">{fin.title}</td>
                            <td className="p-4 md:p-8 text-slate-600 font-medium">{fin.client}</td>
-                           <td className="p-4 md:p-8 text-slate-500 font-medium">{fin.dueDate}</td>
+                           <td className="p-4 md:p-8 text-slate-500 font-medium">{formatDate(fin.dueDate)}</td>
                            <td className="p-4 md:p-8 font-extrabold text-slate-800">{formatCurrency(fin.amount)}</td>
                            <td className="p-4 md:p-8"><span className={`px-3 md:px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase tracking-tight ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{fin.status}</span></td>
                            <td className="p-4 md:p-8 text-right">{fin.status !== 'Pago' && <button onClick={() => handlePay(fin.id)} className="bg-white text-green-600 font-extrabold hover:bg-green-600 hover:text-white px-3 md:px-5 py-2 rounded-xl border-2 border-green-500/20 text-[10px] transition-all duration-300 shadow-sm hover:shadow-green-500/20">Liquidar</button>}</td>
