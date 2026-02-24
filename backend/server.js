@@ -82,9 +82,10 @@ app.patch('/api/cases/:id/move', async (req, res) => {
   }
 });
 
-// CRIAÇÃO DE NOVO PROCESSO E CLIENTE COM VALIDAÇÃO ESTRITA DE CPF
+// CRIAÇÃO DE NOVO PROCESSO E CLIENTE (AGORA COM NÚMERO DO PROCESSO E OBSERVAÇÕES)
 app.post('/api/cases', async (req, res) => {
-  const { client, cpf, phone, title } = req.body;
+  // Desestruturando os novos campos recebidos do frontend
+  const { client, cpf, phone, title, processNumber, notes } = req.body;
 
   if (!client || !title) {
     return res.status(400).json({ error: 'Nome do cliente e título da acção são obrigatórios.' });
@@ -99,7 +100,7 @@ app.post('/api/cases', async (req, res) => {
     // 🚨 REGRA DE NEGÓCIO: BLOQUEIA SE O CPF JÁ EXISTIR NO SISTEMA
     if (cpf) {
       const cpfExists = await prisma.client.findFirst({ where: { cpf: cpf } });
-      if (cpfExists) {
+      if (cpfExists && cpfExists.name !== client) {
         return res.status(400).json({ 
           error: `Este CPF já está associado ao cliente "${cpfExists.name}". Não é possível duplicar cadastros.` 
         });
@@ -121,18 +122,24 @@ app.post('/api/cases', async (req, res) => {
       });
       console.log(`👤 Novo cliente registado: ${client} (CPF: ${cpf})`);
     } else {
-      // Se o cliente já existia no sistema mas não tinha CPF, atualiza-o
-      if (cpf && !dbClient.cpf) {
+      // Se o cliente já existia no sistema mas não tinha CPF ou Phone, atualiza-o
+      if ((cpf && !dbClient.cpf) || (phone && !dbClient.phone)) {
         await prisma.client.update({
           where: { id: dbClient.id },
-          data: { cpf }
+          data: { 
+            ...(cpf && !dbClient.cpf ? { cpf } : {}),
+            ...(phone && !dbClient.phone ? { phone } : {})
+          }
         });
       }
     }
 
+    // Cria o processo anexando os novos campos inteligentes
     const newCase = await prisma.case.create({
       data: {
         title: title,
+        processNumber: processNumber || null, // Grava o número CNJ se existir
+        notes: notes || null,                 // Grava os fatos se existirem
         stage: "peticao",
         status: "Novo",
         anxietyScore: 0,

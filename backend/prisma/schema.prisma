@@ -58,6 +58,9 @@ model Client {
 model Case {
   id            String         @id @default(uuid())
   title         String
+  // NOVOS CAMPOS ADICIONADOS
+  processNumber String?        // Opcional: Número CNJ do processo
+  notes         String?
   status        String         @default("Em Andamento")
   stage         String         @default("peticao")
   anxietyScore  Int            @default(50)
