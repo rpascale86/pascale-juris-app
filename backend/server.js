@@ -24,11 +24,11 @@ app.use(cors({
 
 app.use(express.json());
 
-// 🛡️ NOVO: CHAVE SECRETA (Puxa do .env ou usa fallback)
+// 🛡️ CHAVE SECRETA (Puxa do .env ou usa fallback)
 const JWT_SECRET = process.env.JWT_SECRET || 'pascale_secret_key_2024';
 
 // ============================================================================
-// --- 🛡️ ROTAS DE AUTENTICAÇÃO (LOGIN) ---
+// --- 🛡️ ROTAS DE AUTENTICAÇÃO (LOGIN E REGISTO SaaS) ---
 // ============================================================================
 
 app.post('/api/login', async (req, res) => {
@@ -39,30 +39,21 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    // 1. Procura o advogado pelo email
     const lawyer = await prisma.lawyer.findUnique({
       where: { email: email }
     });
 
     if (!lawyer) {
-      // Mensagem genérica por segurança (não diz se o erro é no email ou na senha)
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
-    // 2. Compara a senha digitada com a senha encriptada (ou em texto plano para contas antigas)
-    // ⚠️ NOTA DE TRANSIÇÃO: Como o nosso seed.js antigo gravou "admin" em texto plano, 
-    // precisamos de uma lógica dupla provisória até forçarmos a encriptação de todas as contas.
     let passwordMatch = false;
     
+    // Suporte para contas antigas vs contas novas encriptadas
     if (lawyer.password.startsWith('$2b$')) {
-        // Se a senha já estiver encriptada com bcrypt (começa com $2b$)
         passwordMatch = await bcrypt.compare(password, lawyer.password);
     } else {
-        // Se for a conta antiga do seed.js (em texto plano)
         passwordMatch = (password === lawyer.password);
-        
-        // BÓNUS DE SEGURANÇA: Se ele fez login com a senha antiga em texto plano, 
-        // nós encriptamos a senha e atualizamos a base de dados em background!
         if (passwordMatch) {
             const hashedPassword = await bcrypt.hash(password, 10);
             await prisma.lawyer.update({
@@ -77,16 +68,14 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
-    // 3. Gera o Token de Acesso (JWT)
     const token = jwt.sign(
       { lawyerId: lawyer.id, email: lawyer.email, name: lawyer.name },
       JWT_SECRET,
-      { expiresIn: '8h' } // O token expira em 8 horas
+      { expiresIn: '8h' }
     );
 
     console.log(`✅ Login bem-sucedido: ${lawyer.name}`);
     
-    // Retorna o token e os dados básicos do advogado
     res.json({
       token,
       lawyer: {
@@ -104,8 +93,67 @@ app.post('/api/login', async (req, res) => {
 });
 
 
+// 🚀 NOVA ROTA: REGISTO DE NOVO ESCRITÓRIO (SaaS)
+app.post('/api/register', async (req, res) => {
+  const { name, email, password, officeName } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
+  }
+
+  try {
+    // 1. Verifica se o e-mail já existe
+    const existingLawyer = await prisma.lawyer.findUnique({ where: { email } });
+    if (existingLawyer) {
+      return res.status(400).json({ error: 'Este e-mail já está em uso. Por favor, faça login.' });
+    }
+
+    // 2. Encripta a palavra-passe na hora
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 3. Define uma cor aleatória bonita para o novo escritório
+    const colors = ['#4f46e5', '#2563eb', '#0284c7', '#0d9488', '#059669', '#dc2626', '#ea580c', '#d97706', '#7c3aed'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+    // 4. Cria o Advogado (Tenant) no banco de dados
+    const newLawyer = await prisma.lawyer.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        primaryColor: randomColor,
+      }
+    });
+
+    // 5. Gera o Token para auto-login
+    const token = jwt.sign(
+      { lawyerId: newLawyer.id, email: newLawyer.email, name: newLawyer.name },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    console.log(`🎉 Novo Escritório Registado: ${officeName || name}`);
+
+    res.status(201).json({
+      token,
+      lawyer: {
+        id: newLawyer.id,
+        name: newLawyer.name,
+        email: newLawyer.email,
+        primaryColor: newLawyer.primaryColor,
+        officeName: officeName // Retornamos para o frontend pintar a tela
+      }
+    });
+
+  } catch (error) {
+    console.error("Erro no registo:", error);
+    res.status(500).json({ error: 'Erro interno ao tentar criar a conta.' });
+  }
+});
+
+
 // ============================================================================
-// --- ROTAS DE LEITURA ---
+// --- ROTAS DE LEITURA E ESCRITA DO SISTEMA ---
 // ============================================================================
 
 app.get('/api/health', async (req, res) => {
@@ -144,10 +192,6 @@ app.get('/api/financials', async (req, res) => {
   }
 });
 
-// ============================================================================
-// --- ROTAS DE ESCRITA ---
-// ============================================================================
-
 app.patch('/api/cases/:id/move', async (req, res) => {
   const { id } = req.params;
   const { stage, status } = req.body;
@@ -169,7 +213,6 @@ app.patch('/api/cases/:id/move', async (req, res) => {
   }
 });
 
-// CRIAÇÃO DE NOVO PROCESSO E CLIENTE (COM NÚMERO DO PROCESSO E OBSERVAÇÕES)
 app.post('/api/cases', async (req, res) => {
   const { client, cpf, phone, title, processNumber, notes } = req.body;
 
@@ -178,12 +221,13 @@ app.post('/api/cases', async (req, res) => {
   }
 
   try {
+    // NOTA: Em produção com multi-tenants, puxamos o lawyerId pelo Token JWT!
+    // Como estamos no MVP, pegamos o primeiro por segurança.
     const lawyer = await prisma.lawyer.findFirst();
     if (!lawyer) {
       return res.status(400).json({ error: 'Nenhum advogado encontrado na base de dados.' });
     }
 
-    // 🚨 REGRA DE NEGÓCIO: BLOQUEIA SE O CPF JÁ EXISTIR NO SISTEMA PARA OUTRO CLIENTE
     if (cpf) {
       const cpfExists = await prisma.client.findFirst({ where: { cpf: cpf } });
       if (cpfExists && cpfExists.name !== client) {
@@ -193,10 +237,8 @@ app.post('/api/cases', async (req, res) => {
       }
     }
 
-    // Procura o cliente pelo nome (para o caso de ele não ter digitado CPF)
     let dbClient = await prisma.client.findFirst({ where: { name: client } });
 
-    // Se não existe, cria um novo
     if (!dbClient) {
       dbClient = await prisma.client.create({
         data: { 
@@ -208,7 +250,6 @@ app.post('/api/cases', async (req, res) => {
       });
       console.log(`👤 Novo cliente registado: ${client} (CPF: ${cpf})`);
     } else {
-      // Se o cliente já existia no sistema mas não tinha CPF ou Phone, atualiza-o
       if ((cpf && !dbClient.cpf) || (phone && !dbClient.phone)) {
         await prisma.client.update({
           where: { id: dbClient.id },
@@ -220,7 +261,6 @@ app.post('/api/cases', async (req, res) => {
       }
     }
 
-    // Cria o processo anexando os novos campos inteligentes
     const newCase = await prisma.case.create({
       data: {
         title: title,
