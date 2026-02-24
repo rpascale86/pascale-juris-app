@@ -37,14 +37,6 @@ import {
 // --- CONFIGURAÇÃO DA NUVEM E DADOS INICIAIS ---
 const API_URL = 'https://pascale-juris-app.onrender.com/api'; 
 
-const TENANT_CONFIG = {
-  name: "Renzo Advogados",
-  primaryColor: "bg-slate-900",
-  secondaryColor: "text-slate-900",
-  logoText: "RENZO JURIS",
-  advogado: "Dr. Renzo"
-};
-
 const DEFAULT_CASES = [
   {
     id: 1,
@@ -88,7 +80,7 @@ const useStickyState = (defaultValue, key) => {
   return [value, setValue];
 };
 
-// --- FUNÇÕES UTILITÁRIAS GLOBAIS (DRY - Don't Repeat Yourself) ---
+// --- FUNÇÕES UTILITÁRIAS GLOBAIS ---
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -103,7 +95,6 @@ const formatDate = (dateString) => {
   return dateString;
 };
 
-// 🚀 BUG CORRIGIDO: Máscara de Telefone à prova de falhas usando RegEx puro
 const applyPhoneMask = (value) => {
   let v = value.replace(/\D/g, ''); 
   if (v.length <= 2) return v.replace(/(\d{2})/, '($1');
@@ -111,7 +102,6 @@ const applyPhoneMask = (value) => {
   return v.replace(/(\d{2})(\d{5})(\d{1,4})/, '($1) $2-$3').slice(0, 15);
 };
 
-// 🚀 NOVA MÁSCARA: Validação visual para CPF
 const applyCpfMask = (value) => {
   let v = value.replace(/\D/g, '');
   if (v.length <= 3) return v;
@@ -140,13 +130,13 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
 
 // ============================================================================
-// 0. PÁGINA DE LOGIN (COM AUTENTICAÇÃO REAL)
+// 0. PÁGINA DE LOGIN (COM AUTENTICAÇÃO REAL E CORES DINÂMICAS)
 // ============================================================================
-const LoginPage = ({ onLogin }) => {
+const LoginPage = ({ onLogin, tenantConfig }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(''); // Estado para mensagem de erro
+  const [errorMsg, setErrorMsg] = useState(''); 
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -163,11 +153,19 @@ const LoginPage = ({ onLogin }) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Guarda o token de segurança no navegador
         localStorage.setItem('pascale_token', data.token);
-        onLogin(); 
+        
+        // 🎨 CRIA A IDENTIDADE VISUAL DINÂMICA
+        const lastName = data.lawyer.name.split(' ').pop().toUpperCase();
+        const dynamicConfig = {
+          name: `${data.lawyer.name} & Associados`,
+          primaryColor: data.lawyer.primaryColor || '#0f172a',
+          logoText: `${lastName} JURIS`,
+          advogado: data.lawyer.name
+        };
+
+        onLogin(dynamicConfig); 
       } else {
-        // Mostra o erro exato retornado pelo servidor
         setErrorMsg(data.error || "Acesso negado.");
       }
     } catch (err) {
@@ -180,12 +178,12 @@ const LoginPage = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-        <div className="bg-slate-800 p-8 text-center border-b-4 border-indigo-500">
-          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-inner">
+        <div className="p-8 text-center transition-colors duration-500" style={{ backgroundColor: tenantConfig.primaryColor }}>
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-inner">
             <Gavel className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">{TENANT_CONFIG.logoText}</h1>
-          <p className="text-slate-300 text-xs font-bold uppercase tracking-widest mt-2">Acesso Restrito</p>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">{tenantConfig.logoText}</h1>
+          <p className="text-white/70 text-xs font-bold uppercase tracking-widest mt-2">Acesso Restrito</p>
         </div>
         <div className="p-8">
           <form onSubmit={handleLogin} className="space-y-4">
@@ -193,22 +191,30 @@ const LoginPage = ({ onLogin }) => {
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Corporativo</label>
               <input 
                 type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="admin@lopes.pt"
+                className="w-full p-3 border rounded-lg focus:ring-2 outline-none transition-shadow" 
+                style={{ '--tw-ring-color': tenantConfig.primaryColor }}
+                placeholder="admin@lopes.pt"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
               <input 
                 type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••"
+                className="w-full p-3 border rounded-lg focus:ring-2 outline-none transition-shadow" 
+                style={{ '--tw-ring-color': tenantConfig.primaryColor }}
+                placeholder="••••••••"
               />
             </div>
-            <button type="submit" disabled={loading} className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition flex justify-center items-center">
+            <button 
+              type="submit" 
+              disabled={loading} 
+              style={{ backgroundColor: tenantConfig.primaryColor }}
+              className="w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-opacity flex justify-center items-center"
+            >
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Acessar o Sistema"}
             </button>
           </form>
 
-          {/* Notificação de Erro na UI */}
           {errorMsg && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-lg text-center animate-fade-in flex items-center justify-center gap-2">
               <AlertTriangle className="w-4 h-4" /> {errorMsg}
@@ -216,7 +222,7 @@ const LoginPage = ({ onLogin }) => {
           )}
 
           <div className="mt-4 text-center">
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Login Seguro via Nuvem</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Software as a Service</p>
           </div>
         </div>
       </div>
@@ -227,7 +233,7 @@ const LoginPage = ({ onLogin }) => {
 // ============================================================================
 // 1. LANDING PAGE (SITE PÚBLICO)
 // ============================================================================
-const LandingPage = ({ onNavigate, onAddLead }) => {
+const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '', type: 'Usucapião' });
   const [showNotification, setShowNotification] = useState(false);
@@ -256,11 +262,11 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
       )}
 
       <header className="px-6 py-4 flex justify-between items-center border-b shadow-sm sticky top-0 bg-white z-50">
-        <div className="flex items-center gap-2 font-bold text-xl text-indigo-900 cursor-pointer" onClick={() => onNavigate('login')}>
+        <div className="flex items-center gap-2 font-bold text-xl cursor-pointer" style={{ color: tenantConfig.primaryColor }} onClick={() => onNavigate('login')}>
           <Gavel className="w-6 h-6" />
-          {TENANT_CONFIG.logoText}
+          {tenantConfig.logoText}
         </div>
-        <button onClick={() => onNavigate('portal')} className="px-4 py-2 bg-indigo-100 text-indigo-900 rounded-lg font-medium hover:bg-indigo-200 transition">
+        <button onClick={() => onNavigate('portal')} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 transition">
           Área do Cliente
         </button>
       </header>
@@ -270,15 +276,15 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
-              <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: João Silva" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: João Silva" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Celular</label>
-              <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="(11) 99999-9999" value={formData.phone} onChange={e => setFormData({...formData, phone: applyPhoneMask(e.target.value)})} />
+              <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="(11) 99999-9999" value={formData.phone} onChange={e => setFormData({...formData, phone: applyPhoneMask(e.target.value)})} />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Caso</label>
-              <select className="w-full p-3 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+              <select className="w-full p-3 border rounded-lg bg-white outline-none focus:ring-2" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
                 <option value="Usucapião">Usucapião (Imobiliário)</option>
                 <option value="Trabalhista">Trabalhista</option>
                 <option value="Cível">Cível / Consumidor</option>
@@ -286,26 +292,26 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
                 <option value="Empresarial">Empresarial</option>
               </select>
             </div>
-            <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">Enviar Pedido</button>
+            <button type="submit" className="w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition" style={{ backgroundColor: tenantConfig.primaryColor }}>Enviar Pedido</button>
           </form>
         </Modal>
 
         <section className="px-6 py-20 md:py-32 max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6 animate-fade-in">
             <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold tracking-wide uppercase">ADVOCACIA DIGITAL</span>
-            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight text-slate-900 tracking-tight">Seu processo jurídico, <span className="text-indigo-600">sem segredos.</span></h1>
-            <p className="text-lg text-slate-600 leading-relaxed">Na {TENANT_CONFIG.name}, não precisa ligar para saber o que está acontecendo. Acompanhe cada passo do seu caso em tempo real pelo nosso aplicativo exclusivo.</p>
+            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight text-slate-900 tracking-tight">Seu processo jurídico, <span style={{ color: tenantConfig.primaryColor }}>sem segredos.</span></h1>
+            <p className="text-lg text-slate-600 leading-relaxed">Na {tenantConfig.name}, não precisa ligar para saber o que está acontecendo. Acompanhe cada passo do seu caso em tempo real pelo nosso aplicativo exclusivo.</p>
             <div className="flex gap-4 pt-4">
-              <button onClick={() => setIsModalOpen(true)} className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">Iniciar Consulta</button>
-              <button onClick={() => onNavigate('portal')} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:border-indigo-600 transition">Já sou Cliente</button>
+              <button onClick={() => setIsModalOpen(true)} className="px-8 py-4 text-white rounded-xl font-bold text-lg shadow-lg hover:opacity-90 transition transform hover:-translate-y-1" style={{ backgroundColor: tenantConfig.primaryColor }}>Iniciar Consulta</button>
+              <button onClick={() => onNavigate('portal')} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:border-slate-300 transition">Já sou Cliente</button>
             </div>
           </div>
           <div className="flex-1 flex justify-center relative animate-fade-in" style={{animationDelay: '0.2s'}}>
-              <div className="absolute -inset-4 bg-indigo-500/20 blur-3xl rounded-full"></div>
+              <div className="absolute -inset-4 opacity-20 blur-3xl rounded-full" style={{ backgroundColor: tenantConfig.primaryColor }}></div>
               <div className="relative w-72 h-[550px] bg-slate-900 rounded-[3rem] border-8 border-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/20">
                 <div className="absolute top-0 w-full h-full bg-slate-50 flex flex-col p-6 pt-12 space-y-4">
                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm shadow-sm">L</div>
+                      <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-700 font-bold text-sm shadow-sm">L</div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Bem-vindo</div>
                         <div className="font-bold text-slate-800 text-sm tracking-tight">Carlos Silva</div>
@@ -314,12 +320,12 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                       <div className="text-[10px] text-green-600 font-bold mb-1">MOVIMENTAÇÃO RECENTE</div>
                       <div className="font-bold text-slate-800 text-xs">Juiz recebeu documentos</div>
-                      <div className="w-full bg-slate-100 h-1 mt-3 rounded-full overflow-hidden"><div className="w-3/5 h-full bg-indigo-500"></div></div>
+                      <div className="w-full bg-slate-100 h-1 mt-3 rounded-full overflow-hidden"><div className="w-3/5 h-full" style={{ backgroundColor: tenantConfig.primaryColor }}></div></div>
                    </div>
-                   <div className="bg-indigo-600 p-4 rounded-xl shadow-lg text-white">
+                   <div className="p-4 rounded-xl shadow-lg text-white" style={{ backgroundColor: tenantConfig.primaryColor }}>
                       <div className="font-bold text-sm mb-1">Precisa de ajuda?</div>
                       <div className="text-[10px] opacity-80 mb-3 leading-tight">Fale com o seu advogado agora mesmo.</div>
-                      <div className="w-full py-2 bg-white/10 rounded text-center text-xs font-bold">Abrir Chat</div>
+                      <div className="w-full py-2 bg-white/20 rounded text-center text-xs font-bold">Abrir Chat</div>
                    </div>
                 </div>
               </div>
@@ -333,7 +339,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
 // ============================================================================
 // 2. PORTAL DO CLIENTE
 // ============================================================================
-const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials }) => {
+const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials, tenantConfig }) => {
   const [chatOpen, setChatOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
@@ -361,7 +367,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     setTimeout(() => {
       setIsUploading(false);
       setUploadOpen(false);
-      onUploadDocument({ name: "Documento_Carlos_Silva.pdf", client: caseData.client });
+      onUploadDocument({ name: "Documento_Cliente.pdf", client: caseData.client });
       onNotifyLawyer("Novo Documento Recebido de Carlos Silva.");
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
@@ -382,16 +388,16 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 
   if (!caseData) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
-      <Activity className="w-12 h-12 mb-4 text-slate-300 animate-spin" />
+      <Activity className="w-12 h-12 mb-4 animate-spin" style={{ color: tenantConfig.primaryColor }} />
       <p>Aguardando dados da nuvem...</p>
-      <button onClick={() => onNavigate('landing')} className="mt-4 text-indigo-600 font-bold hover:underline">Voltar</button>
+      <button onClick={() => onNavigate('login')} className="mt-4 font-bold hover:underline" style={{ color: tenantConfig.primaryColor }}>Voltar</button>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20 overflow-x-hidden">
       {showNotification && (
-        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200] bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-slide-up">
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200] text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-slide-up" style={{ backgroundColor: tenantConfig.primaryColor }}>
           <UploadCloud className="w-5 h-5" />
           <span className="font-bold text-sm">Documento enviado com sucesso!</span>
         </div>
@@ -399,9 +405,9 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 
       <Modal isOpen={financialOpen} onClose={() => setFinancialOpen(false)} title="Financeiro">
         <div className="space-y-4">
-          <div className="bg-indigo-50 p-4 rounded-lg flex justify-between items-center mb-4 border border-indigo-100">
-             <span className="text-sm font-bold text-indigo-900">Total Pendente</span>
-             <span className="text-xl font-extrabold text-indigo-700">
+          <div className="bg-slate-100 p-4 rounded-lg flex justify-between items-center mb-4 border border-slate-200">
+             <span className="text-sm font-bold text-slate-700">Total Pendente</span>
+             <span className="text-xl font-extrabold" style={{ color: tenantConfig.primaryColor }}>
                {formatCurrency(totalPendente)}
              </span>
           </div>
@@ -427,53 +433,58 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
       <Modal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} title="Enviar Documento">
         {!isUploading ? (
           <div className="space-y-6">
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-400 hover:bg-indigo-50 transition cursor-pointer">
-              <UploadCloud className="w-12 h-12 mb-2 text-indigo-300" />
+            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 transition cursor-pointer">
+              <UploadCloud className="w-12 h-12 mb-2 opacity-50" style={{ color: tenantConfig.primaryColor }} />
               <p className="text-sm font-bold text-slate-600">Arraste o arquivo aqui</p>
               <p className="text-[10px]">PDF, JPG ou PNG (Max 10MB)</p>
             </div>
-            <button onClick={handleUpload} className="w-full py-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg shadow-indigo-200 uppercase tracking-wide text-xs">Confirmar Envio Seguro</button>
+            <button onClick={handleUpload} className="w-full py-4 text-white rounded-lg font-bold shadow-lg uppercase tracking-wide text-xs hover:opacity-90" style={{ backgroundColor: tenantConfig.primaryColor }}>Confirmar Envio Seguro</button>
           </div>
         ) : (
           <div className="py-10 text-center space-y-4">
-             <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
-             <p className="text-indigo-900 font-bold animate-pulse text-sm">Processando...</p>
+             <div className="w-12 h-12 border-4 border-slate-200 rounded-full animate-spin mx-auto" style={{ borderTopColor: tenantConfig.primaryColor }}></div>
+             <p className="font-bold animate-pulse text-sm" style={{ color: tenantConfig.primaryColor }}>Processando...</p>
           </div>
         )}
       </Modal>
 
       {chatOpen && (
         <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-up md:max-w-md md:right-4 md:left-auto md:bottom-4 md:top-auto md:h-[600px] md:shadow-2xl md:rounded-2xl border-slate-200">
-          <div className="bg-indigo-900 text-white p-4 flex justify-between items-center md:rounded-t-2xl">
+          <div className="text-white p-4 flex justify-between items-center md:rounded-t-2xl" style={{ backgroundColor: tenantConfig.primaryColor }}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">
-                {TENANT_CONFIG.advogado.substring(4, 6).toUpperCase()}
+                {tenantConfig.advogado.substring(0, 2).toUpperCase()}
               </div>
-              <div><div className="font-bold text-sm leading-none mb-1">{TENANT_CONFIG.advogado}</div><div className="text-[10px] opacity-70 flex items-center gap-1"><div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div> Disponível agora</div></div>
+              <div><div className="font-bold text-sm leading-none mb-1">{tenantConfig.advogado}</div><div className="text-[10px] opacity-70 flex items-center gap-1"><div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div> Disponível agora</div></div>
             </div>
-            <button onClick={() => setChatOpen(false)} className="p-1"><X className="w-6 h-6" /></button>
+            <button onClick={() => setChatOpen(false)} className="p-1 hover:bg-white/10 rounded-full transition"><X className="w-6 h-6" /></button>
           </div>
           <div className="flex-1 bg-slate-100 p-4 space-y-4 overflow-y-auto">
             {messages.map(msg => (
               <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-3 rounded-2xl text-sm max-w-[85%] shadow-sm ${msg.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none'}`}>{msg.text}</div>
+                <div 
+                  className={`p-3 rounded-2xl text-sm max-w-[85%] shadow-sm ${msg.sender === 'user' ? 'text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none'}`}
+                  style={msg.sender === 'user' ? { backgroundColor: tenantConfig.primaryColor } : {}}
+                >
+                  {msg.text}
+                </div>
               </div>
             ))}
-            {isTyping && <div className="text-[10px] text-slate-400 italic">{TENANT_CONFIG.advogado} está digitando...</div>}
+            {isTyping && <div className="text-[10px] text-slate-400 italic">{tenantConfig.advogado} está digitando...</div>}
             <div ref={chatEndRef} />
           </div>
           <div className="p-4 bg-white border-t flex gap-2 md:rounded-b-2xl">
-            <input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 bg-slate-100 rounded-full px-4 text-sm outline-none border border-transparent focus:border-indigo-500 transition" placeholder="Escreva a sua dúvida..." />
-            <button onClick={handleSendMessage} className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg flex-shrink-0 transition hover:bg-indigo-700"><Send className="w-4 h-4" /></button>
+            <input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 bg-slate-100 rounded-full px-4 text-sm outline-none border border-transparent focus:border-slate-300 transition" placeholder="Escreva a sua dúvida..." />
+            <button onClick={handleSendMessage} className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg flex-shrink-0 transition hover:opacity-90" style={{ backgroundColor: tenantConfig.primaryColor }}><Send className="w-4 h-4" /></button>
           </div>
         </div>
       )}
 
-      <div className={`${TENANT_CONFIG.primaryColor} text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg`}>
+      <div className="text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg transition-colors duration-500" style={{ backgroundColor: tenantConfig.primaryColor }}>
         <div className="flex justify-between items-center mb-8">
            <button onClick={() => onNavigate('landing')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ArrowRight className="w-5 h-5 rotate-180" /></button>
            <span className="font-bold text-[10px] uppercase tracking-[0.2em] opacity-70">Painel do Cliente</span>
-           <div className="relative"><Bell className="w-5 h-5 opacity-70" /><div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900"></div></div>
+           <div className="relative"><Bell className="w-5 h-5 opacity-70" /><div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white/20"></div></div>
         </div>
         <div className="flex flex-col items-center">
            <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold mb-4 shadow-xl ring-2 ring-white/10">
@@ -486,31 +497,34 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 
       <div className="px-6 -mt-8 space-y-6 max-w-lg mx-auto">
         <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 animate-fade-in relative overflow-hidden">
-           <div className="absolute right-0 top-0 w-16 h-16 bg-indigo-50/50 rounded-bl-full"></div>
+           <div className="absolute right-0 top-0 w-16 h-16 opacity-10 rounded-bl-full" style={{ backgroundColor: tenantConfig.primaryColor }}></div>
            <div className="flex justify-between items-start mb-4">
              <div className="relative z-10">
-               <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Ação Cível</span>
+               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-tighter bg-slate-100" style={{ color: tenantConfig.primaryColor }}>Ação Cível</span>
                <h2 className="text-lg font-bold text-slate-800 mt-2 leading-tight tracking-tight">{caseData.title}</h2>
-               <p className="text-[10px] text-slate-400 mt-1 font-mono tracking-tighter">PROC. 00123.45.2024.BR</p>
+               <p className="text-[10px] text-slate-400 mt-1 font-mono tracking-tighter">PROC. {caseData.processNumber || "Aguardando Numeração"}</p>
              </div>
              <Activity className="w-5 h-5 text-green-500 animate-pulse" />
            </div>
            <div className="space-y-2 relative z-10">
              <div className="flex justify-between text-[11px] font-bold text-slate-500"><span>Evolução Estimada</span><span>60%</span></div>
-             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden shadow-inner"><div className="w-[60%] h-full bg-indigo-500 rounded-full transition-all duration-1000"></div></div>
+             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden shadow-inner"><div className="w-[60%] h-full rounded-full transition-all duration-1000" style={{ backgroundColor: tenantConfig.primaryColor }}></div></div>
            </div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-sm"><Clock className="w-4 h-4 text-indigo-600" /> Histórico de Etapas</h3>
+          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-sm"><Clock className="w-4 h-4" style={{ color: tenantConfig.primaryColor }} /> Histórico de Etapas</h3>
           <div className="space-y-8 relative">
             <div className="absolute left-[11px] top-2 bottom-4 w-[2px] bg-slate-100"></div>
             {caseData.timeline && caseData.timeline.map((step) => (
               <div key={step.id} className="relative z-10 flex gap-4">
-                <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center bg-white transition-all duration-500 ${step.completed ? 'border-green-500 text-green-500 bg-green-50/50' : step.current || step.isCurrent ? 'border-indigo-600 text-indigo-600 ring-4 ring-indigo-50' : 'border-slate-200'}`}>
-                  {step.completed ? <CheckCircle className="w-3 h-3 fill-current" /> : step.current || step.isCurrent ? <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div> : null}
+                <div 
+                  className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center bg-white transition-all duration-500 ${step.completed ? 'border-green-500 text-green-500 bg-green-50/50' : 'border-slate-200'}`}
+                  style={!step.completed && (step.current || step.isCurrent) ? { borderColor: tenantConfig.primaryColor, color: tenantConfig.primaryColor, boxShadow: `0 0 0 4px ${tenantConfig.primaryColor}15` } : {}}
+                >
+                  {step.completed ? <CheckCircle className="w-3 h-3 fill-current" /> : step.current || step.isCurrent ? <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: tenantConfig.primaryColor }}></div> : null}
                 </div>
-                <div className={`${step.current || step.isCurrent ? 'opacity-100' : 'opacity-60'}`}>
+                <div className={`${step.current || step.isCurrent || step.completed ? 'opacity-100' : 'opacity-60'}`}>
                   <h4 className="font-bold text-slate-800 text-sm tracking-tight">{step.title}</h4>
                   <span className="text-[10px] text-slate-400 font-bold block mb-1">{step.date}</span>
                   <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.description || step.desc}</p>
@@ -521,10 +535,10 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => setChatOpen(true)} className="p-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 flex flex-col items-center gap-2 text-xs transition active:scale-95"><MessageSquare className="w-5 h-5" /> Falar com {TENANT_CONFIG.advogado}</button>
-          <button onClick={() => setFinancialOpen(true)} className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 text-xs hover:border-indigo-500 transition active:scale-95"><DollarSign className="w-5 h-5 text-green-600" /> Ver Pagamentos</button>
+          <button onClick={() => setChatOpen(true)} className="p-4 text-white rounded-2xl font-bold shadow-lg flex flex-col items-center gap-2 text-xs transition active:scale-95 hover:opacity-90" style={{ backgroundColor: tenantConfig.primaryColor }}><MessageSquare className="w-5 h-5" /> Falar com {tenantConfig.advogado}</button>
+          <button onClick={() => setFinancialOpen(true)} className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 text-xs hover:border-slate-300 transition active:scale-95"><DollarSign className="w-5 h-5 text-green-600" /> Ver Pagamentos</button>
         </div>
-        <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5 text-indigo-500" /> Enviar Arquivo Digital</button>
+        <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5" style={{ color: tenantConfig.primaryColor }} /> Enviar Arquivo Digital</button>
       </div>
     </div>
   );
@@ -533,7 +547,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 // ============================================================================
 // 3. PAINEL DO ADVOGADO
 // ============================================================================
-const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead }) => {
+const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead, tenantConfig }) => {
   const [activeTab, setActiveTab] = useState('kanban');
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -594,7 +608,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
   const handleAttendWhatsApp = (phone, name) => {
     const phoneDigits = phone.replace(/\D/g, '');
-    const message = `Olá, ${name}! Aqui é do escritório ${TENANT_CONFIG.name}. Tudo bem? Estou entrando em contato sobre o seu processo.`;
+    const message = `Olá, ${name}! Aqui é do escritório ${tenantConfig.name}. Tudo bem? Estou entrando em contato sobre o seu processo.`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
   };
@@ -604,7 +618,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       onUpdateLead(lead.id, 'Contatado');
     }
     const phoneDigits = lead.phone.replace(/\D/g, '');
-    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como o ${TENANT_CONFIG.advogado} pode te ajudar hoje?`;
+    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como o ${tenantConfig.advogado} pode te ajudar hoje?`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
     
@@ -718,31 +732,31 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         <form onSubmit={handleAddNewCase} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo do Cliente</label>
-            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: João da Silva" value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} />
+            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: João da Silva" value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} />
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF <span className="text-[9px] lowercase font-normal">(Opcional)</span></label>
-                <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="000.000.000-00" value={newCaseData.cpf} onChange={e => setNewCaseData({...newCaseData, cpf: applyCpfMask(e.target.value)})} />
+                <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="000.000.000-00" value={newCaseData.cpf} onChange={e => setNewCaseData({...newCaseData, cpf: applyCpfMask(e.target.value)})} />
             </div>
             <div className="flex-1">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp <span className="text-[9px] lowercase font-normal">(Opcional)</span></label>
-                <input type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: applyPhoneMask(e.target.value)})} />
+                <input type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: applyPhoneMask(e.target.value)})} />
             </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Ação</label>
-            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Usucapião Imóvel X" value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} />
+            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: Usucapião Imóvel X" value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número do Processo (CNJ) <span className="text-slate-400 font-normal normal-case ml-1">- Opcional</span></label>
-            <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: 0001234-56.2024.8.26.0000" value={newCaseData.processNumber} onChange={e => setNewCaseData({...newCaseData, processNumber: e.target.value})} />
+            <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: 0001234-56.2024.8.26.0000" value={newCaseData.processNumber} onChange={e => setNewCaseData({...newCaseData, processNumber: e.target.value})} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações Importantes <span className="text-slate-400 font-normal normal-case ml-1">- Opcional</span></label>
-            <textarea rows="3" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 resize-none text-sm" placeholder="Anote os detalhes e fatos da primeira reunião..." value={newCaseData.notes} onChange={e => setNewCaseData({...newCaseData, notes: e.target.value})} />
+            <textarea rows="3" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50 resize-none text-sm" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Anote os detalhes e fatos da primeira reunião..." value={newCaseData.notes} onChange={e => setNewCaseData({...newCaseData, notes: e.target.value})} />
           </div>
-          <button type="submit" disabled={isSavingCase} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center ${isSavingCase ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+          <button type="submit" disabled={isSavingCase} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center hover:opacity-90 ${isSavingCase ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ backgroundColor: tenantConfig.primaryColor }}>
             {isSavingCase ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Salvar e Adicionar ao Painel"}
           </button>
         </form>
@@ -753,7 +767,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         <form onSubmit={handleAddNewFin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
-            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.client} onChange={e => setNewFinData({...newFinData, client: e.target.value})}>
+            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={newFinData.client} onChange={e => setNewFinData({...newFinData, client: e.target.value})}>
               <option value="">Selecione um cliente ativo...</option>
               {activeClients.map(clientName => (
                 <option key={clientName} value={clientName}>{clientName}</option>
@@ -763,7 +777,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Cobrança</label>
-            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finChargeType} onChange={e => setFinChargeType(e.target.value)}>
+            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={finChargeType} onChange={e => setFinChargeType(e.target.value)}>
               <option value="Honorários Iniciais">Honorários Iniciais</option>
               <option value="Honorários Finais">Honorários Finais</option>
               <option value="Parcelamento">Parcelamento mensal</option>
@@ -775,11 +789,11 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="flex gap-4 animate-fade-in">
               <div className="flex-1">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parcela Atual</label>
-                <input required type="number" min="1" max={finTotalInstallments} className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finCurrentInstallment} onChange={e => setFinCurrentInstallment(e.target.value)} />
+                <input required type="number" min="1" max={finTotalInstallments} className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={finCurrentInstallment} onChange={e => setFinCurrentInstallment(e.target.value)} />
               </div>
               <div className="flex-1">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">De (Total)</label>
-                <input required type="number" min="2" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finTotalInstallments} onChange={e => setFinTotalInstallments(e.target.value)} />
+                <input required type="number" min="2" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={finTotalInstallments} onChange={e => setFinTotalInstallments(e.target.value)} />
               </div>
             </div>
           )}
@@ -787,29 +801,29 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           {finChargeType === 'Outro' && (
             <div className="animate-fade-in">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição Livre</label>
-              <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Custas Judiciais / Emissão Documentos" value={finCustomTitle} onChange={e => setFinCustomTitle(e.target.value)} />
+              <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: Custas Judiciais / Emissão Documentos" value={finCustomTitle} onChange={e => setFinCustomTitle(e.target.value)} />
             </div>
           )}
 
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
-              <input required type="number" step="0.01" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="1500.00" value={newFinData.amount} onChange={e => setNewFinData({...newFinData, amount: e.target.value})} />
+              <input required type="number" step="0.01" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="1500.00" value={newFinData.amount} onChange={e => setNewFinData({...newFinData, amount: e.target.value})} />
             </div>
             <div className="flex-1">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vencimento</label>
-              <input required type="date" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.dueDate} onChange={e => setNewFinData({...newFinData, dueDate: e.target.value})} />
+              <input required type="date" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={newFinData.dueDate} onChange={e => setNewFinData({...newFinData, dueDate: e.target.value})} />
             </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forma de Pagamento</label>
-            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.type} onChange={e => setNewFinData({...newFinData, type: e.target.value})}>
+            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={newFinData.type} onChange={e => setNewFinData({...newFinData, type: e.target.value})}>
               <option value="Boleto">Boleto</option>
               <option value="Pix">Pix</option>
               <option value="Cartão">Cartão</option>
             </select>
           </div>
-          <button type="submit" disabled={isSavingFin} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center ${isSavingFin ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+          <button type="submit" disabled={isSavingFin} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center hover:opacity-90 ${isSavingFin ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ backgroundColor: tenantConfig.primaryColor }}>
             {isSavingFin ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Lançar Cobrança"}
           </button>
         </form>
@@ -820,7 +834,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         <form onSubmit={handleAddNewDoc} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
-            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newDocData.client} onChange={e => setNewDocData({...newDocData, client: e.target.value})}>
+            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={newDocData.client} onChange={e => setNewDocData({...newDocData, client: e.target.value})}>
               <option value="">Selecione um cliente ativo...</option>
               {activeClients.map(clientName => (
                 <option key={clientName} value={clientName}>{clientName}</option>
@@ -829,13 +843,13 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Arquivo</label>
-            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Contrato_Assinado.pdf" value={newDocData.name} onChange={e => setNewDocData({...newDocData, name: e.target.value})} />
+            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: Contrato_Assinado.pdf" value={newDocData.name} onChange={e => setNewDocData({...newDocData, name: e.target.value})} />
           </div>
-          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-indigo-400 transition">
-             <UploadCloud className="w-8 h-8 mb-2 text-indigo-300" />
+          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-slate-400 transition">
+             <UploadCloud className="w-8 h-8 mb-2 opacity-50" style={{ color: tenantConfig.primaryColor }} />
              <p className="text-xs font-bold">Anexar arquivo falso para teste</p>
           </div>
-          <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
+          <button type="submit" className="w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition" style={{ backgroundColor: tenantConfig.primaryColor }}>
             Salvar Documento
           </button>
         </form>
@@ -849,24 +863,24 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         />
       )}
 
-      {/* SIDEBAR DO ADVOGADO */}
-      <aside className={`fixed md:relative z-[70] h-full w-64 bg-slate-900 text-slate-300 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-        <div className="p-6 md:p-8 border-b border-slate-800 flex items-center justify-between">
+      {/* SIDEBAR DO ADVOGADO COM COR DINÂMICA */}
+      <aside className={`fixed md:relative z-[70] h-full w-64 text-white flex flex-col shadow-2xl transition-all duration-500 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`} style={{ backgroundColor: tenantConfig.primaryColor }}>
+        <div className="p-6 md:p-8 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-900/50"><Gavel className="w-5 h-5 text-white" /></div>
-            <span className="font-extrabold text-white tracking-tighter text-lg">{TENANT_CONFIG.logoText}</span>
+            <div className="p-2 bg-white/20 rounded-lg shadow-lg"><Gavel className="w-5 h-5 text-white" /></div>
+            <span className="font-extrabold text-white tracking-tighter text-lg">{tenantConfig.logoText}</span>
           </div>
           <button className="md:hidden text-white/50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
             <X className="w-5 h-5" />
           </button>
         </div>
         <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
-          <button onClick={() => { setActiveTab('kanban'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'kanban' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/20 translate-x-1' : 'hover:bg-slate-800'}`}><Activity className="w-5 h-5" /> <span className="text-sm font-bold">Painel de Gestão</span></button>
-          <button onClick={() => { setActiveTab('leads'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'leads' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><Users className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Novos Leads</span> {leads && leads.length > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white">{leads.length}</span>}</button>
-          <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Documentação</span></button>
-          <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controle Financeiro</span></button>
+          <button onClick={() => { setActiveTab('kanban'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'kanban' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><Activity className="w-5 h-5" /> <span className="text-sm font-bold">Painel de Gestão</span></button>
+          <button onClick={() => { setActiveTab('leads'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'leads' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><Users className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Novos Leads</span> {leads && leads.length > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white">{leads.length}</span>}</button>
+          <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Documentação</span></button>
+          <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controle Financeiro</span></button>
         </nav>
-        <div className="p-6 border-t border-slate-800"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold hover:text-white transition opacity-60 hover:bg-red-500/10 hover:text-red-400 hover:opacity-100"><LogOut className="w-4 h-4" /> Sair do Sistema</button></div>
+        <div className="p-6 border-t border-white/10"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold hover:text-white transition opacity-60 hover:bg-red-500/80 hover:opacity-100"><LogOut className="w-4 h-4" /> Sair do Sistema</button></div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden w-full">
@@ -879,7 +893,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             
             {/* BOTÕES DE AÇÃO DINÂMICOS */}
             {activeTab === 'kanban' && (
-              <button onClick={() => setIsAddCaseModalOpen(true)} className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+              <button onClick={() => setIsAddCaseModalOpen(true)} className="text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg hover:opacity-90 hover:-translate-y-0.5 transition-all active:scale-95 text-sm" style={{ backgroundColor: tenantConfig.primaryColor }}>
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Processo</span>
               </button>
             )}
@@ -889,17 +903,17 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
               </button>
             )}
             {activeTab === 'docs' && (
-              <button onClick={() => setIsAddDocModalOpen(true)} className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+              <button onClick={() => setIsAddDocModalOpen(true)} className="text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg hover:opacity-90 hover:-translate-y-0.5 transition-all active:scale-95 text-sm" style={{ backgroundColor: tenantConfig.primaryColor }}>
                 <UploadCloud className="w-4 h-4" /> <span className="hidden sm:inline">Upload Arquivo</span>
               </button>
             )}
 
             <div className="hidden md:flex flex-col text-right border-l pl-6 border-slate-200">
-              <span className="text-sm font-extrabold text-slate-800">{TENANT_CONFIG.advogado}</span>
+              <span className="text-sm font-extrabold text-slate-800">{tenantConfig.advogado}</span>
               <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">Acesso Seguro</span>
             </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg border-2 border-slate-800 shadow-sm">
-              {TENANT_CONFIG.advogado.substring(4, 6).toUpperCase()}
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shadow-sm" style={{ backgroundColor: tenantConfig.primaryColor }}>
+              {tenantConfig.advogado.substring(0, 2).toUpperCase()}
             </div>
           </div>
         </header>
@@ -944,13 +958,14 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                        <tr key={lead.id} className="hover:bg-slate-50/50 transition duration-300">
                          <td className="p-4 md:p-8 font-bold text-slate-800">{lead.name}</td>
                          <td className="p-4 md:p-8 text-slate-600 font-medium">{lead.phone}</td>
-                         <td className="p-4 md:p-8"><span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-tighter">{lead.type}</span></td>
+                         <td className="p-4 md:p-8"><span className="bg-slate-100 px-3 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-tighter" style={{ color: tenantConfig.primaryColor }}>{lead.type}</span></td>
                          <td className="p-4 md:p-8 text-slate-400 font-medium">{lead.date}</td>
                          <td className="p-4 md:p-8"><span className={`px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase ${lead.status === 'Novo' ? 'bg-green-100 text-green-700 animate-pulse' : 'bg-slate-100 text-slate-500'}`}>{lead.status}</span></td>
                          <td className="p-4 md:p-8 text-right">
                            <button 
                              onClick={() => handleAttendLead(lead)} 
-                             className={`${lead.status === 'Novo' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/10' : 'bg-green-500 hover:bg-green-600 shadow-green-900/10'} text-white font-extrabold px-4 md:px-5 py-2.5 rounded-xl text-[10px] transition shadow-lg flex items-center gap-2 ml-auto`}
+                             className={`text-white font-extrabold px-4 md:px-5 py-2.5 rounded-xl text-[10px] transition shadow-lg flex items-center gap-2 ml-auto hover:opacity-90`}
+                             style={lead.status === 'Novo' ? { backgroundColor: tenantConfig.primaryColor } : { backgroundColor: '#22c55e' }}
                            >
                              <MessageSquare className="w-3 h-3" />
                              {lead.status === 'Novo' ? 'Atender' : 'WhatsApp'}
@@ -970,11 +985,11 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                    <tbody className="divide-y divide-slate-100">
                      {documents && documents.map(doc => (
                        <tr key={doc.id} className="hover:bg-slate-50/50 transition duration-300">
-                         <td className="p-4 md:p-8 font-bold text-slate-800 flex items-center gap-3 md:gap-4"><div className="p-2 bg-indigo-50 rounded-lg"><File className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" /></div> {doc.name}</td>
+                         <td className="p-4 md:p-8 font-bold text-slate-800 flex items-center gap-3 md:gap-4"><div className="p-2 bg-slate-100 rounded-lg"><File className="w-4 h-4 md:w-5 md:h-5" style={{ color: tenantConfig.primaryColor }} /></div> {doc.name}</td>
                          <td className="p-4 md:p-8 text-slate-600 font-medium">{doc.client}</td>
                          <td className="p-4 md:p-8 text-slate-500 font-medium">{doc.date}</td>
                          <td className="p-4 md:p-8 text-slate-400 text-[10px] font-extrabold uppercase tracking-tighter">{doc.size}</td>
-                         <td className="p-4 md:p-8 text-right"><button className="text-indigo-600 font-extrabold hover:bg-indigo-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent hover:border-indigo-100 flex items-center gap-2 ml-auto shadow-sm"><Download className="w-4 h-4" /> <span className="hidden sm:inline">Baixar</span></button></td>
+                         <td className="p-4 md:p-8 text-right"><button className="font-extrabold hover:bg-slate-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent flex items-center gap-2 ml-auto shadow-sm" style={{ color: tenantConfig.primaryColor }}><Download className="w-4 h-4" /> <span className="hidden sm:inline">Baixar</span></button></td>
                        </tr>
                      ))}
                    </tbody>
@@ -984,36 +999,32 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="animate-fade-in space-y-8 md:space-y-12">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
                 
-                {/* O Bloco de Processos em Carteira */}
                 <div onClick={() => setNotification({ title: "Processos Ativos", message: `Você tem ${cases.length} processos sendo geridos no momento.`, type: "info" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
-                  <div className="absolute right-0 top-0 w-16 h-16 md:w-24 h-24 bg-indigo-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
+                  <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 opacity-10 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right" style={{ backgroundColor: tenantConfig.primaryColor }}></div>
                   <div className="text-[9px] md:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Processos em Carteira</div>
                   <div className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tighter">{cases.length}</div>
                 </div>
                 
-                {/* O Bloco de Estatística de Ansiedade */}
                 <div onClick={() => setNotification({ title: "Alerta de Ansiedade", message: `Existem ${cases.filter(c => c.anxietyScore > 70).length} clientes que precisam de atenção. Role para baixo e veja os alertas vermelhos.`, type: "warning" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
-                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 h-24 bg-red-50 rounded-bl-full group-hover:scale-125 transition duration-700 opacity-60 origin-top-right"></div>
+                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-red-50 rounded-bl-full group-hover:scale-125 transition duration-700 opacity-60 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-red-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
                      Índice de Ansiedade <AlertTriangle className="w-3 h-3" />
                    </div>
                    <div className="text-3xl md:text-5xl font-extrabold text-red-600 tracking-tighter">{cases.filter(c => c.anxietyScore > 70).length}</div>
                 </div>
                 
-                {/* O Bloco de Conversões Pendentes */}
                 <div onClick={() => setActiveTab('leads')} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
-                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 h-24 bg-green-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
+                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-green-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-green-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
                      Conversões Pendentes <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                    </div>
                    <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads && leads.filter(l => l.status === 'Novo').length}</div>
                 </div>
 
-                {/* O Bloco de Eficiência */}
-                <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema gerou 8.4 mil ações automáticas neste mês, poupando tempo valioso da sua equipe.", type: "success" })} className="cursor-pointer bg-indigo-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500">
-                   <div className="text-[9px] md:text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Eficiência</div>
+                <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema gerou 8.4 mil ações automáticas neste mês, poupando tempo valioso da sua equipe.", type: "success" })} className="cursor-pointer p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500" style={{ backgroundColor: tenantConfig.primaryColor }}>
+                   <div className="text-[9px] md:text-[10px] text-white/70 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Eficiência</div>
                    <div className="text-3xl md:text-5xl font-extrabold text-white tracking-tighter">8.4k</div>
-                   <p className="text-[8px] md:text-[9px] text-indigo-400 mt-2 md:mt-3 font-extrabold uppercase tracking-wider">Avisos Proativos</p>
+                   <p className="text-[8px] md:text-[9px] text-white/50 mt-2 md:mt-3 font-extrabold uppercase tracking-wider">Avisos Proativos</p>
                 </div>
 
               </div>
@@ -1022,7 +1033,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
                 {[
                   { id: 'peticao', title: 'Fase Inicial (Petição)', color: 'border-slate-300', items: groupedCases.peticao },
-                  { id: 'analise_juiz', title: 'Em Andamento (Juiz)', color: 'border-indigo-400', items: groupedCases.analise_juiz },
+                  { id: 'analise_juiz', title: 'Em Andamento (Juiz)', color: 'border-slate-400', items: groupedCases.analise_juiz },
                   { id: 'sentenca', title: 'Concluído (Sentença)', color: 'border-green-400', items: groupedCases.sentenca }
                 ].map(col => (
                   <div key={col.id} className="bg-slate-200/40 rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-8 border border-slate-200/50 min-h-[400px] md:min-h-[550px] flex flex-col gap-4 md:gap-6 backdrop-blur-sm">
@@ -1034,7 +1045,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                        <span className="bg-white text-slate-800 font-extrabold text-[10px] px-3 py-1 rounded-full shadow-sm border border-slate-200">{col.items.length}</span>
                     </div>
                     {col.items.map(c => (
-                      <div key={c.id} className={`bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-[6px] transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 md:hover:-translate-y-2 group relative overflow-hidden ${c.anxietyScore > 70 ? 'border-l-red-500' : 'border-l-indigo-600'}`}>
+                      <div key={c.id} className={`bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-[6px] transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 md:hover:-translate-y-2 group relative overflow-hidden`} style={c.anxietyScore > 70 ? { borderLeftColor: '#ef4444' } : { borderLeftColor: tenantConfig.primaryColor }}>
                          <div className="flex justify-between items-start mb-4">
                            <span className="text-[8px] md:text-[9px] font-extrabold uppercase bg-slate-50 text-slate-500 px-3 py-1 rounded-full tracking-tighter">{c.status}</span>
                            
@@ -1050,12 +1061,12 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                            )}
                          </div>
                          
-                         <h3 className="font-extrabold text-slate-800 text-base md:text-lg mb-1 leading-tight tracking-tight group-hover:text-indigo-600 transition">{c.client}</h3>
+                         <h3 className="font-extrabold text-slate-800 text-base md:text-lg mb-1 leading-tight tracking-tight transition hover:opacity-80 cursor-default" style={{ hover: { color: tenantConfig.primaryColor } }}>{c.client}</h3>
                          <p className="text-[10px] md:text-[11px] text-slate-400 font-semibold mb-1 truncate">{c.title}</p>
                          
                          {/* MOSTRADOR DE NÚMERO DO PROCESSO */}
                          {c.processNumber && (
-                            <p className="text-[9px] font-mono text-indigo-500 mb-4 truncate bg-indigo-50 px-2 py-0.5 rounded inline-block">{c.processNumber}</p>
+                            <p className="text-[9px] font-mono mb-4 truncate px-2 py-0.5 rounded inline-block bg-slate-100" style={{ color: tenantConfig.primaryColor }}>{c.processNumber}</p>
                          )}
                          {/* MOSTRADOR DE NOTAS */}
                          {c.notes && (
@@ -1063,7 +1074,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          )}
                          
                          <div className="flex justify-between items-center pt-4 md:pt-5 border-t border-slate-50 gap-2 mt-auto">
-                            {/* Botão de WhatsApp */}
                             <button 
                               onClick={() => handleAttendWhatsApp(c.phone || "11999999999", c.client)}
                               className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold text-green-600 bg-green-50 px-3 py-2 rounded-lg hover:bg-green-100 transition whitespace-nowrap"
@@ -1071,9 +1081,8 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                               <MessageSquare className="w-3 h-3" /> WhatsApp
                             </button>
 
-                            {/* Botão Avançar Fase */}
                             {col.id !== 'sentenca' && (
-                              <button onClick={() => handleMove(c.id)} className="text-[9px] md:text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 md:px-4 py-2 rounded-xl transition-all duration-300 shadow-sm hover:bg-indigo-100">
+                              <button onClick={() => handleMove(c.id)} className="text-[9px] md:text-[10px] font-extrabold px-3 md:px-4 py-2 rounded-xl transition-all duration-300 shadow-sm bg-slate-50 hover:bg-slate-100" style={{ color: tenantConfig.primaryColor }}>
                                 Avançar ➔
                               </button>
                             )}
@@ -1104,6 +1113,14 @@ export default function App() {
   const [currentView, setCurrentView] = useState('login'); 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  
+  // 🎨 CONFIGURAÇÃO WHITE-LABEL (Guarda na memória o escritório do utilizador)
+  const [tenantConfig, setTenantConfig] = useStickyState({
+    name: "Lopes & Associados",
+    primaryColor: "#0f172a", // Cor Padrão (Slate 900)
+    logoText: "LOPES JURIS",
+    advogado: "Dr. Marcos Lopes"
+  }, 'pascale_tenant_config');
   
   // Estados Globais
   const [cases, setCases] = useState([]);
@@ -1245,25 +1262,39 @@ export default function App() {
     setCurrentView('login');
   };
 
+  // 🚀 ROTEADOR COM INJEÇÃO DE COR DINÂMICA
   const renderView = () => {
     if (currentView === 'dashboard' && isAuthenticated) {
       if (loadingData) {
         return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
-            <Activity className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
-            <p className="font-extrabold uppercase text-xs animate-pulse text-indigo-200">A Sincronizar com a Nuvem...</p>
+          <div className="min-h-screen flex flex-col items-center justify-center text-white font-sans transition-colors duration-500" style={{ backgroundColor: tenantConfig.primaryColor }}>
+            <Activity className="w-12 h-12 animate-spin mb-6 opacity-80" />
+            <p className="font-extrabold uppercase text-xs animate-pulse opacity-80">A Sincronizar com a Nuvem...</p>
           </div>
         );
       }
-      return <LawyerDashboard cases={cases} onMoveCase={(id) => moveCaseInCloud(id, cases.find(c=>c.id===id)?.stage)} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} onAddFinancial={handleAddFinancial} onAddDocument={handleUploadDocument} globalNotifications={globalNotifications} onLogout={handleLogout} onUpdateLead={updateLeadStatus} />;
+      return <LawyerDashboard cases={cases} onMoveCase={(id) => moveCaseInCloud(id, cases.find(c=>c.id===id)?.stage)} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} onAddFinancial={handleAddFinancial} onAddDocument={handleUploadDocument} globalNotifications={globalNotifications} onLogout={handleLogout} onUpdateLead={updateLeadStatus} tenantConfig={tenantConfig} />;
     }
 
-    // Se tentar aceder a qualquer outra coisa ou não estiver logado, cai no Login.
-    return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
+    // --- CÓDIGO MANTIDO MAS COMENTADO (FASE 2) ---
+    /*
+    if (currentView === 'portal') {
+      return <ClientPortal onNavigate={setCurrentView} caseData={cases[0]} onNotifyLawyer={notifyLawyer} messages={messages} onSendMessage={handleSendMessage} onUploadDocument={handleUploadDocument} financials={financials} tenantConfig={tenantConfig} />;
+    }
+    if (currentView === 'landing') {
+      return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} tenantConfig={tenantConfig} />;
+    }
+    */
+
+    return <LoginPage onLogin={(newConfig) => { 
+        if(newConfig) setTenantConfig(newConfig); 
+        setIsAuthenticated(true); 
+        setCurrentView('dashboard'); 
+    }} tenantConfig={tenantConfig} />;
   };
 
   return (
-    <div className="antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="antialiased min-h-screen selection:bg-black/10 selection:text-black">
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -1272,8 +1303,8 @@ export default function App() {
         .animate-slide-up { animation: slide-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
         .animate-slide-in { animation: slide-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
       `}</style>
       {renderView()}
     </div>
