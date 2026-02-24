@@ -2,9 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
-// 🛡️ IMPORTAÇÃO DAS BIBLIOTECAS DE SEGURANÇA
+// 🛡️ IMPORTAÇÃO DAS BIBLIOTECAS DE SEGURANÇA E UPLOAD
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
 
 dotenv.config();
 
@@ -23,6 +24,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// 📦 CONFIGURAÇÃO DO MULTER (Para receber ficheiros físicos do Frontend)
+const upload = multer({ storage: multer.memoryStorage() });
 
 // 🛡️ CHAVE SECRETA (Puxa do .env ou usa fallback)
 const JWT_SECRET = process.env.JWT_SECRET || 'pascale_secret_key_2024';
@@ -389,20 +393,32 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/documents', authenticateToken, async (req, res) => {
+// 🚀 ROTA ATUALIZADA: AGORA COM MULTER (UPLOAD REAL)
+app.post('/api/documents', authenticateToken, upload.single('file'), async (req, res) => {
   const { name, client } = req.body;
+  const file = req.file;
+
+  if (!name || !client) {
+    return res.status(400).json({ error: 'Nome e cliente são obrigatórios.' });
+  }
+
   try {
+    // Calcula o tamanho real do ficheiro enviado
+    const fileSizeMB = file ? (file.size / (1024 * 1024)).toFixed(2) + ' MB' : 'Desconhecido';
+    console.log(`📥 Ficheiro Recebido: ${name} (${fileSizeMB})`);
+
     const newDoc = await prisma.document.create({
       data: {
         name,
         client,
-        size: "1.5 MB", // Placeholder enquanto não há upload real (S3)
-        date: "Hoje",
+        size: fileSizeMB, 
+        date: new Date().toLocaleDateString('pt-PT'),
         lawyerId: req.user.lawyerId
       }
     });
     res.status(201).json(newDoc);
   } catch(e) {
+    console.error("Erro ao guardar documento:", e);
     res.status(500).json({ error: 'Erro ao guardar documento.' });
   }
 });
