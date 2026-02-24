@@ -51,15 +51,17 @@ const DEFAULT_CASES = [
     id: 1,
     client: "Carlos Silva",
     phone: "(11) 99999-9999",
-    title: "Ação de Indenização vs Banco X",
+    title: "Acção de Indemnização vs Banco X",
+    processNumber: "0001234-56.2024.8.26.0000",
+    notes: "Cliente relatou cobrança de taxa indevida em Janeiro.",
     status: "Em Andamento",
     stage: "analise_juiz",
     anxietyScore: 85, 
     lastUpdate: "Há 2 dias",
     timeline: [
-      { id: 1, title: "Petição Inicial", date: "10/01/2024", completed: true, desc: "Enviamos o seu pedido ao juiz." },
+      { id: 1, title: "Petição Inicial", date: "10/01/2024", completed: true, desc: "Enviámos o seu pedido ao juiz." },
       { id: 2, title: "Citação do Réu", date: "15/01/2024", completed: true, desc: "O Banco foi notificado do processo." },
-      { id: 3, title: "Análise do Juiz", date: "Hoje", completed: false, current: true, desc: "O juiz está analisando nossos argumentos. Isso demora em média 20 dias." },
+      { id: 3, title: "Análise do Juiz", date: "Hoje", completed: false, current: true, desc: "O juiz está a analisar os nossos argumentos. Isto demora em média 20 dias." },
       { id: 4, title: "Audiência", date: "Pendente", completed: false, desc: "Reunião para ouvir testemunhas." },
       { id: 5, title: "Sentença", date: "Pendente", completed: false, desc: "Decisão final do juiz." }
     ]
@@ -68,11 +70,11 @@ const DEFAULT_CASES = [
 
 const DEFAULT_LEADS = [
   { id: 1, name: "Roberto Justus", phone: "(11) 98888-7777", type: "Trabalhista", status: "Novo", date: "Há 10 min" },
-  { id: 2, name: "Ana Maria", phone: "(21) 99999-8888", type: "Família", status: "Contatado", date: "Ontem" }
+  { id: 2, name: "Ana Maria", phone: "(21) 99999-8888", type: "Família", status: "Contactado", date: "Ontem" }
 ];
 
 const DEFAULT_MESSAGES = [
-  { id: 1, text: "Olá Carlos! Vi que acessou o portal. Tem alguma dúvida sobre a etapa atual?", sender: 'bot', time: '10:30' }
+  { id: 1, text: "Olá Carlos! Vi que acedeu ao portal. Tem alguma dúvida sobre a etapa atual?", sender: 'bot', time: '10:30' }
 ];
 
 const DEFAULT_DOCUMENTS = [
@@ -98,7 +100,7 @@ const useStickyState = (defaultValue, key) => {
 
 // --- FUNÇÕES UTILITÁRIAS GLOBAIS ---
 const formatCurrency = (value) => {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value);
 };
 
 const formatDate = (dateString) => {
@@ -182,14 +184,14 @@ const LoginPage = ({ onLogin }) => {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Palavra-passe</label>
               <input 
                 type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••"
               />
             </div>
             <button type="submit" disabled={loading} className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition flex justify-center items-center">
-              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Acessar o Sistema"}
+              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Aceder ao Sistema"}
             </button>
           </form>
           <div className="mt-4 text-center">
@@ -205,7 +207,7 @@ const LoginPage = ({ onLogin }) => {
 // 1. LANDING PAGE (SITE PÚBLICO)
 // ============================================================================
 // NOTA: Este componente está mantido no código, mas a rota de acesso
-// foi comentada no roteador principal no final do arquivo.
+// foi comentada no roteador principal no final do ficheiro.
 const LandingPage = ({ onNavigate, onAddLead }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '', type: 'Cível' });
@@ -215,7 +217,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
     e.preventDefault();
     const rawPhone = formData.phone.replace(/\D/g, '');
     if (rawPhone.length < 10) {
-      alert("Por favor, digite um número de celular válido com o DDD.");
+      alert("Por favor, digite um número de telemóvel válido.");
       return;
     }
     onAddLead({ id: Date.now(), name: formData.name, phone: formData.phone, type: formData.type, status: "Novo", date: "Agora mesmo" });
@@ -252,7 +254,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
               <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: João Silva" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Celular</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Telemóvel</label>
               <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="(11) 99999-9999" value={formData.phone} onChange={e => setFormData({...formData, phone: applyPhoneMask(e.target.value)})} />
             </div>
             <div>
@@ -271,8 +273,8 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
         <section className="px-6 py-20 md:py-32 max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6 animate-fade-in">
             <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold tracking-wide uppercase">ADVOCACIA DIGITAL</span>
-            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight text-slate-900 tracking-tight">Seu processo jurídico, <span className="text-indigo-600">sem segredos.</span></h1>
-            <p className="text-lg text-slate-600 leading-relaxed">Na {TENANT_CONFIG.name}, não precisa ligar para saber o que está acontecendo. Acompanhe cada passo do seu caso em tempo real pelo nosso aplicativo exclusivo.</p>
+            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight text-slate-900 tracking-tight">O seu processo jurídico, <span className="text-indigo-600">sem segredos.</span></h1>
+            <p className="text-lg text-slate-600 leading-relaxed">Na {TENANT_CONFIG.name}, não precisa ligar para saber o que está a acontecer. Acompanhe cada passo do seu caso em tempo real pelo nosso aplicativo exclusivo.</p>
             <div className="flex gap-4 pt-4">
               <button onClick={() => setIsModalOpen(true)} className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">Iniciar Consulta</button>
               <button onClick={() => onNavigate('portal')} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:border-indigo-600 transition">Já sou Cliente</button>
@@ -312,7 +314,7 @@ const LandingPage = ({ onNavigate, onAddLead }) => {
 // 2. PORTAL DO CLIENTE (ÁREA EXCLUSIVA)
 // ============================================================================
 // NOTA: Este componente está mantido no código, mas a rota de acesso
-// foi comentada no roteador principal no final do arquivo.
+// foi comentada no roteador principal no final do ficheiro.
 const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials }) => {
   const [chatOpen, setChatOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -364,7 +366,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
   if (!caseData) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
       <Activity className="w-12 h-12 mb-4 text-slate-300 animate-spin" />
-      <p>Aguardando dados da nuvem...</p>
+      <p>A aguardar dados da nuvem...</p>
       <button onClick={() => onNavigate('login')} className="mt-4 text-indigo-600 font-bold hover:underline">Voltar</button>
     </div>
   );
@@ -412,7 +414,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
           <div className="space-y-6">
             <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-400 hover:bg-indigo-50 transition cursor-pointer">
               <UploadCloud className="w-12 h-12 mb-2 text-indigo-300" />
-              <p className="text-sm font-bold text-slate-600">Arraste o arquivo aqui</p>
+              <p className="text-sm font-bold text-slate-600">Arraste o ficheiro aqui</p>
               <p className="text-[10px]">PDF, JPG ou PNG (Max 10MB)</p>
             </div>
             <button onClick={handleUpload} className="w-full py-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg shadow-indigo-200 uppercase tracking-wide text-xs">Confirmar Envio Seguro</button>
@@ -420,7 +422,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
         ) : (
           <div className="py-10 text-center space-y-4">
              <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
-             <p className="text-indigo-900 font-bold animate-pulse text-sm">Processando...</p>
+             <p className="text-indigo-900 font-bold animate-pulse text-sm">A processar...</p>
           </div>
         )}
       </Modal>
@@ -443,7 +445,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
                 <div className={`p-3 rounded-2xl text-sm max-w-[85%] shadow-sm ${msg.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none'}`}>{msg.text}</div>
               </div>
             ))}
-            {isTyping && <div className="text-[10px] text-slate-400 italic">{TENANT_CONFIG.advogado} está digitando...</div>}
+            {isTyping && <div className="text-[10px] text-slate-400 italic">{TENANT_CONFIG.advogado} está a escrever...</div>}
             <div ref={chatEndRef} />
           </div>
           <div className="p-4 bg-white border-t flex gap-2 md:rounded-b-2xl">
@@ -465,7 +467,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
              {caseData.client ? caseData.client.substring(0,2).toUpperCase() : 'CS'}
            </div>
            <h1 className="text-2xl font-bold tracking-tight">Olá, {caseData.client}</h1>
-           <p className="opacity-70 text-sm mt-1 font-medium">Seu processo está estável e monitorado.</p>
+           <p className="opacity-70 text-sm mt-1 font-medium">O seu processo está estável e monitorizado.</p>
         </div>
       </div>
 
@@ -474,9 +476,11 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
            <div className="absolute right-0 top-0 w-16 h-16 bg-indigo-50/50 rounded-bl-full"></div>
            <div className="flex justify-between items-start mb-4">
              <div className="relative z-10">
-               <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Ação Cível</span>
+               <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Acção Cível</span>
                <h2 className="text-lg font-bold text-slate-800 mt-2 leading-tight tracking-tight">{caseData.title}</h2>
-               <p className="text-[10px] text-slate-400 mt-1 font-mono tracking-tighter">PROC. {caseData.id.toString().slice(0,8)}</p>
+               {caseData.processNumber && (
+                 <p className="text-[10px] text-slate-500 mt-1 font-mono tracking-tighter">PROC. {caseData.processNumber}</p>
+               )}
              </div>
              <Activity className="w-5 h-5 text-green-500 animate-pulse" />
            </div>
@@ -499,10 +503,10 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
                 <div className={`${step.isCurrent || step.completed ? 'opacity-100' : 'opacity-60'}`}>
                   <h4 className="font-bold text-slate-800 text-sm tracking-tight">{step.title}</h4>
                   <span className="text-[10px] text-slate-400 font-bold block mb-1">{step.date}</span>
-                  <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.description || step.desc || "Aguardando atualização..."}</p>
+                  <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.description || step.desc || "A aguardar atualização..."}</p>
                 </div>
               </div>
-            )) : <p className="text-xs text-slate-400 text-center">Nenhum histórico registrado ainda.</p>}
+            )) : <p className="text-xs text-slate-400 text-center">Nenhum histórico registado ainda.</p>}
           </div>
         </div>
 
@@ -510,7 +514,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
           <button onClick={() => setChatOpen(true)} className="p-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 flex flex-col items-center gap-2 text-xs transition active:scale-95"><MessageSquare className="w-5 h-5" /> Falar com Advogado</button>
           <button onClick={() => setFinancialOpen(true)} className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 text-xs hover:border-indigo-500 transition active:scale-95"><DollarSign className="w-5 h-5 text-green-600" /> Ver Pagamentos</button>
         </div>
-        <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5 text-indigo-500" /> Enviar Arquivo Digital</button>
+        <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5 text-indigo-500" /> Enviar Ficheiro Digital</button>
       </div>
     </div>
   );
@@ -553,8 +557,8 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [isSavingCase, setIsSavingCase] = useState(false);
   const [isSavingFin, setIsSavingFin] = useState(false);
 
-  // Estados dos Formulários com CPF
-  const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '' });
+  // ESTADOS DOS FORMULÁRIOS (AGORA COM PROCESS NUMBER E NOTES)
+  const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '', processNumber: '', notes: '' });
   const [newDocData, setNewDocData] = useState({ name: '', client: '' });
   
   // Estado Inteligente para o Financeiro
@@ -581,34 +585,34 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
   const handlePay = (id) => {
     onUpdateFinancial(id, "Pago");
-    setNotification({ title: "Financeiro", message: "Pagamento registrado com sucesso.", type: "success" });
+    setNotification({ title: "Financeiro", message: "Pagamento registado com sucesso.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
 
   const handleAttendWhatsApp = (phone, name) => {
     const phoneDigits = phone.replace(/\D/g, '');
-    const message = `Olá, ${name}! Aqui é do escritório ${TENANT_CONFIG.name}. Tudo bem? Estou entrando em contato sobre o seu processo.`;
+    const message = `Olá, ${name}! Aqui é do escritório ${TENANT_CONFIG.name}. Tudo bem? Estou a entrar em contacto sobre o seu processo.`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
   };
 
   const handleAttendLead = (lead) => {
     if (lead.status === 'Novo') {
-      onUpdateLead(lead.id, 'Contatado');
+      onUpdateLead(lead.id, 'Contactado');
     }
     const phoneDigits = lead.phone.replace(/\D/g, '');
-    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como podemos te ajudar hoje?`;
+    const message = `Olá, ${lead.name}! Recebemos o seu contacto através do nosso portal jurídico referente à área de ${lead.type}. Como podemos ajudar hoje?`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
     
-    setNotification({ title: "Atendimento Iniciado", message: `Abrindo WhatsApp para ${lead.name}...`, type: "success" });
+    setNotification({ title: "Atendimento Iniciado", message: `A abrir WhatsApp para ${lead.name}...`, type: "success" });
     setTimeout(() => setNotification(null), 4000);
   };
 
   const handleAnxietyClick = (clientName) => {
     setNotification({ 
       title: "Alerta de Ansiedade - " + clientName, 
-      message: "Este cliente demonstra um nível alto de ansiedade. Priorize o envio de uma atualização pelo WhatsApp para tranquilizá-lo.", 
+      message: "Este cliente demonstra um nível alto de ansiedade. Priorize o envio de uma atualização pelo WhatsApp para o tranquilizar.", 
       type: "warning" 
     });
     setTimeout(() => setNotification(null), 7000);
@@ -619,24 +623,23 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const handleAddNewCase = async (e) => {
     e.preventDefault();
     const rawPhone = newCaseData.phone.replace(/\D/g, '');
-    if (rawPhone.length < 10) {
-      setNotification({ title: "Telefone Inválido", message: "Por favor, digite apenas números, incluindo o DDD.", type: "warning" });
+    if (rawPhone.length < 10 && newCaseData.phone.length > 0) {
+      setNotification({ title: "Telemóvel Inválido", message: "Por favor, digite apenas números, incluindo o indicativo.", type: "warning" });
       setTimeout(() => setNotification(null), 4000);
       return; 
     }
 
-    setIsSavingCase(true); // Gira o loading
-    const result = await onAddCase(newCaseData); // Espera a nuvem responder
-    setIsSavingCase(false); // Para o loading
+    setIsSavingCase(true); 
+    const result = await onAddCase(newCaseData); 
+    setIsSavingCase(false); 
 
     if (result && result.success === false) {
-      // MOSTRA O ERRO EXATO DA API
       setNotification({ title: "Falha ao Salvar", message: result.error, type: "warning" });
       setTimeout(() => setNotification(null), 6000);
     } else {
       setIsAddCaseModalOpen(false);
-      setNewCaseData({ client: '', cpf: '', phone: '', title: '' });
-      setNotification({ title: "Processo Cadastrado", message: "Gravado na Nuvem com sucesso.", type: "success" });
+      setNewCaseData({ client: '', cpf: '', phone: '', title: '', processNumber: '', notes: '' });
+      setNotification({ title: "Processo Registado", message: "Gravado na Nuvem com sucesso.", type: "success" });
       setTimeout(() => setNotification(null), 3000);
     }
   };
@@ -656,7 +659,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       finalTitle = finCustomTitle;
     }
 
-    setIsSavingFin(true); // Loading
+    setIsSavingFin(true); 
     const result = await onAddFinancial({ ...newFinData, title: finalTitle });
     setIsSavingFin(false);
 
@@ -685,7 +688,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     onAddDocument(newDocData);
     setIsAddDocModalOpen(false);
     setNewDocData({ name: '', client: '' });
-    setNotification({ title: "Arquivo Salvo", message: "O documento foi anexado ao cliente com sucesso.", type: "success" });
+    setNotification({ title: "Ficheiro Salvo", message: "O documento foi anexado ao cliente com sucesso.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -709,7 +712,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </div>
       )}
 
-      {/* Modal Novo Processo com CPF */}
+      {/* Modal Novo Processo OTIMIZADO */}
       <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Cadastrar Novo Processo (Nuvem)">
         <form onSubmit={handleAddNewCase} className="space-y-4">
           <div>
@@ -718,17 +721,25 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF <span className="text-[9px] lowercase font-normal">(Opcional)</span></label>
                 <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="000.000.000-00" value={newCaseData.cpf} onChange={e => setNewCaseData({...newCaseData, cpf: applyCpfMask(e.target.value)})} />
             </div>
             <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
-                <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: applyPhoneMask(e.target.value)})} />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telemóvel <span className="text-[9px] lowercase font-normal">(Opcional)</span></label>
+                <input type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: applyPhoneMask(e.target.value)})} />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Ação</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Acção</label>
             <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Usucapião Imóvel X" value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número do Processo (CNJ) <span className="text-slate-400 font-normal normal-case ml-1">- Opcional</span></label>
+            <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: 0001234-56.2024.8.26.0000" value={newCaseData.processNumber} onChange={e => setNewCaseData({...newCaseData, processNumber: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações Importantes <span className="text-slate-400 font-normal normal-case ml-1">- Opcional</span></label>
+            <textarea rows="3" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 resize-none text-sm" placeholder="Anote os detalhes e factos da primeira reunião..." value={newCaseData.notes} onChange={e => setNewCaseData({...newCaseData, notes: e.target.value})} />
           </div>
           <button type="submit" disabled={isSavingCase} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center ${isSavingCase ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
             {isSavingCase ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Salvar e Adicionar ao Painel"}
@@ -781,7 +792,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (€)</label>
               <input required type="number" step="0.01" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="1500.00" value={newFinData.amount} onChange={e => setNewFinData({...newFinData, amount: e.target.value})} />
             </div>
             <div className="flex-1">
@@ -804,7 +815,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
       </Modal>
 
       {/* Modal Novo Documento */}
-      <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload de Arquivo">
+      <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload de Ficheiro">
         <form onSubmit={handleAddNewDoc} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
@@ -821,7 +832,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-indigo-400 transition">
              <UploadCloud className="w-8 h-8 mb-2 text-indigo-300" />
-             <p className="text-xs font-bold">Anexar arquivo falso para teste</p>
+             <p className="text-xs font-bold">Anexar ficheiro falso para teste</p>
           </div>
           <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
             Salvar Documento
@@ -852,7 +863,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           <button onClick={() => { setActiveTab('kanban'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'kanban' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/20 translate-x-1' : 'hover:bg-slate-800'}`}><Activity className="w-5 h-5" /> <span className="text-sm font-bold">Painel de Gestão</span></button>
           <button onClick={() => { setActiveTab('leads'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'leads' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><Users className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Novos Leads</span> {leads && leads.length > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white">{leads.length}</span>}</button>
           <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Documentação</span></button>
-          <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controle Financeiro</span></button>
+          <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'hover:bg-slate-800'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controlo Financeiro</span></button>
         </nav>
         <div className="p-6 border-t border-slate-800"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold hover:text-white transition opacity-60 hover:bg-red-500/10 hover:text-red-400 hover:opacity-100"><LogOut className="w-4 h-4" /> Sair do Sistema</button></div>
       </aside>
@@ -904,7 +915,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
                    <table className="w-full text-left text-sm min-w-[600px]">
                      <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
-                       <tr><th className="p-4 md:p-8">Descrição da Fatura</th><th className="p-4 md:p-8">Cliente</th><th className="p-4 md:p-8">Vencimento</th><th className="p-4 md:p-8">Montante</th><th className="p-4 md:p-8">Estado</th><th className="p-4 md:p-8 text-right">Ações</th></tr>
+                       <tr><th className="p-4 md:p-8">Descrição da Fatura</th><th className="p-4 md:p-8">Cliente</th><th className="p-4 md:p-8">Vencimento</th><th className="p-4 md:p-8">Montante</th><th className="p-4 md:p-8">Estado</th><th className="p-4 md:p-8 text-right">Acções</th></tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100">
                        {financials && financials.map(fin => (
@@ -925,7 +936,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="animate-fade-in bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
                  <table className="w-full text-left text-sm min-w-[600px]">
                    <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
-                     <tr><th className="p-4 md:p-8">Interessado</th><th className="p-4 md:p-8">Contato</th><th className="p-4 md:p-8">Área</th><th className="p-4 md:p-8">Data Entrada</th><th className="p-4 md:p-8">Status</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
+                     <tr><th className="p-4 md:p-8">Interessado</th><th className="p-4 md:p-8">Contacto</th><th className="p-4 md:p-8">Área</th><th className="p-4 md:p-8">Data Entrada</th><th className="p-4 md:p-8">Status</th><th className="p-4 md:p-8 text-right">Acção</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
                      {leads && leads.map(lead => (
@@ -953,7 +964,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="animate-fade-in bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
                 <table className="w-full text-left text-sm min-w-[600px]">
                    <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
-                     <tr><th className="p-4 md:p-8">Arquivo Digital</th><th className="p-4 md:p-8">Remetente</th><th className="p-4 md:p-8">Data</th><th className="p-4 md:p-8">Tamanho</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
+                     <tr><th className="p-4 md:p-8">Arquivo Digital</th><th className="p-4 md:p-8">Remetente</th><th className="p-4 md:p-8">Data</th><th className="p-4 md:p-8">Tamanho</th><th className="p-4 md:p-8 text-right">Acção</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
                      {documents && documents.map(doc => (
@@ -962,7 +973,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <td className="p-4 md:p-8 text-slate-600 font-medium">{doc.client}</td>
                          <td className="p-4 md:p-8 text-slate-500 font-medium">{doc.date}</td>
                          <td className="p-4 md:p-8 text-slate-400 text-[10px] font-extrabold uppercase tracking-tighter">{doc.size}</td>
-                         <td className="p-4 md:p-8 text-right"><button className="text-indigo-600 font-extrabold hover:bg-indigo-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent hover:border-indigo-100 flex items-center gap-2 ml-auto shadow-sm"><Download className="w-4 h-4" /> <span className="hidden sm:inline">Baixar</span></button></td>
+                         <td className="p-4 md:p-8 text-right"><button className="text-indigo-600 font-extrabold hover:bg-indigo-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent hover:border-indigo-100 flex items-center gap-2 ml-auto shadow-sm"><Download className="w-4 h-4" /> <span className="hidden sm:inline">Descarregar</span></button></td>
                        </tr>
                      ))}
                    </tbody>
@@ -1039,9 +1050,18 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          </div>
                          
                          <h3 className="font-extrabold text-slate-800 text-base md:text-lg mb-1 leading-tight tracking-tight group-hover:text-indigo-600 transition">{c.client}</h3>
-                         <p className="text-[10px] md:text-[11px] text-slate-400 font-semibold mb-5 md:mb-6 truncate">{c.title}</p>
+                         <p className="text-[10px] md:text-[11px] text-slate-400 font-semibold mb-1 truncate">{c.title}</p>
                          
-                         <div className="flex justify-between items-center pt-4 md:pt-5 border-t border-slate-50 gap-2">
+                         {/* MOSTRADOR DE NÚMERO DO PROCESSO */}
+                         {c.processNumber && (
+                            <p className="text-[9px] font-mono text-indigo-500 mb-4 truncate bg-indigo-50 px-2 py-0.5 rounded inline-block">{c.processNumber}</p>
+                         )}
+                         {/* MOSTRADOR DE NOTAS */}
+                         {c.notes && (
+                            <p className="text-[9px] text-slate-400 italic mb-4 line-clamp-2 leading-relaxed">"{c.notes}"</p>
+                         )}
+                         
+                         <div className="flex justify-between items-center pt-4 md:pt-5 border-t border-slate-50 gap-2 mt-auto">
                             {/* Botão de WhatsApp */}
                             <button 
                               onClick={() => handleAttendWhatsApp(c.phone || "11999999999", c.client)}
@@ -1105,6 +1125,8 @@ export default function App() {
           setCases(data.map(dbCase => ({
             id: dbCase.id,
             title: dbCase.title,
+            processNumber: dbCase.processNumber, // Puxa o número do processo
+            notes: dbCase.notes,                 // Puxa as notas
             status: dbCase.status,
             stage: dbCase.stage,
             client: dbCase.client?.name || 'Cliente Sem Nome',
@@ -1152,7 +1174,7 @@ export default function App() {
       });
       
       if (response.ok) {
-        await fetchCloudData(); // Só mostra na tela depois que o banco de dados confirma
+        await fetchCloudData(); // Só mostra na tela depois que a base de dados confirma
         return { success: true };
       } else {
         const errData = await response.json().catch(() => ({}));
