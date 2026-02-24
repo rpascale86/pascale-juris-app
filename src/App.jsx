@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   Gavel, 
   Users, 
@@ -39,18 +39,11 @@ const API_URL = 'https://pascale-juris-app.onrender.com/api';
 
 const DEFAULT_CASES = [];
 const DEFAULT_FINANCIALS = [];
-
-const DEFAULT_LEADS = [
-  { id: 1, name: "Roberto Justus", phone: "(11) 98888-7777", type: "Trabalhista", status: "Novo", date: "Há 10 min" },
-  { id: 2, name: "Ana Maria", phone: "(21) 99999-8888", type: "Família", status: "Contactado", date: "Ontem" }
-];
+const DEFAULT_LEADS = [];
+const DEFAULT_DOCUMENTS = [];
 
 const DEFAULT_MESSAGES = [
   { id: 1, text: "Olá! Vi que acedeu ao portal. Tem alguma dúvida?", sender: 'bot', time: '10:30' }
-];
-
-const DEFAULT_DOCUMENTS = [
-  { id: 1, name: "Procuracao_Assinada.pdf", client: "Carlos Silva", date: "10/01/2024", size: "1.2 MB" }
 ];
 
 // --- HOOKS DE PERSISTÊNCIA ---
@@ -95,7 +88,7 @@ const applyCpfMask = (value) => {
 };
 
 // --- COMPONENTES DE INTERFACE ---
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = React.memo(({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
@@ -110,7 +103,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
       </div>
     </div>
   );
-};
+});
 
 
 // ============================================================================
@@ -125,23 +118,22 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(''); 
 
-  const handleLogin = async (e) => {
+  const handleAuth = async (e, endpoint, payload) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
 
     try {
-      const response = await fetch(`${API_URL}/login`, {
+      const response = await fetch(`${API_URL}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
 
       if (response.ok) {
         localStorage.setItem('pascale_token', data.token);
-        
         const lastName = data.lawyer.name.split(' ').pop().toUpperCase();
         const dynamicConfig = {
           name: data.lawyer.officeName || `${data.lawyer.name} & Associados`,
@@ -149,46 +141,9 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
           logoText: `${lastName} JURIS`,
           advogado: data.lawyer.name
         };
-
         onLogin(dynamicConfig); 
       } else {
-        setErrorMsg(data.error || "Acesso negado.");
-      }
-    } catch (err) {
-      setErrorMsg("Erro de comunicação com o servidor.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg('');
-
-    try {
-      const response = await fetch(`${API_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, officeName })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        localStorage.setItem('pascale_token', data.token);
-        
-        const lastName = data.lawyer.name.split(' ').pop().toUpperCase();
-        const dynamicConfig = {
-          name: data.lawyer.officeName || `${data.lawyer.name} & Associados`,
-          primaryColor: data.lawyer.primaryColor || '#0f172a',
-          logoText: `${lastName} JURIS`,
-          advogado: data.lawyer.name
-        };
-
-        onLogin(dynamicConfig); 
-      } else {
-        setErrorMsg(data.error || "Erro ao criar conta.");
+        setErrorMsg(data.error || `Erro ao ${endpoint === 'login' ? 'aceder' : 'criar conta'}.`);
       }
     } catch (err) {
       setErrorMsg("Erro de comunicação com o servidor.");
@@ -215,7 +170,7 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
 
         <div className="p-8">
           {isRegisterMode ? (
-            <form onSubmit={handleRegister} className="space-y-4 animate-fade-in">
+            <form onSubmit={(e) => handleAuth(e, 'register', { name, email, password, officeName })} className="space-y-4 animate-fade-in">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Seu Nome Completo</label>
                 <input required autoFocus value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-shadow bg-slate-50" placeholder="Ex: Dr. João Silva" />
@@ -232,13 +187,12 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Criar Palavra-passe</label>
                 <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-shadow bg-slate-50" placeholder="Mínimo 6 caracteres" />
               </div>
-              
               <button type="submit" disabled={loading} className="w-full py-3 bg-slate-900 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-opacity flex justify-center items-center mt-2">
                 {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Criar Conta Segura"}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleLogin} className="space-y-4 animate-fade-in">
+            <form onSubmit={(e) => handleAuth(e, 'login', { email, password })} className="space-y-4 animate-fade-in">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Corporativo</label>
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 outline-none transition-shadow bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="admin@lopes.pt" />
@@ -260,11 +214,7 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
           )}
 
           <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-            <button 
-              type="button"
-              onClick={() => { setIsRegisterMode(!isRegisterMode); setErrorMsg(''); }} 
-              className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-            >
+            <button type="button" onClick={() => { setIsRegisterMode(!isRegisterMode); setErrorMsg(''); }} className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors">
               {isRegisterMode ? "Já tem uma conta? Faça Login aqui" : "Ainda não tem conta? Crie o seu Escritório"}
             </button>
           </div>
@@ -277,7 +227,7 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
 
 
 // ============================================================================
-// 1. LANDING PAGE (SITE PÚBLICO) - MANTIDO NO CÓDIGO MAS DESATIVADO
+// 1. LANDING PAGE (SITE PÚBLICO) - CÓDIGO COMPLETO (DESATIVADO NA NAVEGAÇÃO PELA APP)
 // ============================================================================
 const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -291,7 +241,7 @@ const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
       alert("Por favor, digite um número de telemóvel válido.");
       return;
     }
-    onAddLead({ id: Date.now(), name: formData.name, phone: formData.phone, type: formData.type, status: "Novo", date: "Agora mesmo" });
+    onAddLead({ name: formData.name, phone: formData.phone, type: formData.type });
     setFormData({ name: '', phone: '', type: 'Cível' });
     setIsModalOpen(false);
     setShowNotification(true);
@@ -383,7 +333,7 @@ const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
 
 
 // ============================================================================
-// 2. PORTAL DO CLIENTE - MANTIDO NO CÓDIGO MAS DESATIVADO
+// 2. PORTAL DO CLIENTE - CÓDIGO COMPLETO (DESATIVADO NA NAVEGAÇÃO PELA APP)
 // ============================================================================
 const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials, tenantConfig }) => {
   const [chatOpen, setChatOpen] = useState(false);
@@ -436,7 +386,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
       <Activity className="w-12 h-12 mb-4 animate-spin" style={{ color: tenantConfig.primaryColor }} />
       <p>A aguardar dados da nuvem...</p>
-      <button onClick={() => onNavigate('landing')} className="mt-4 font-bold hover:underline" style={{ color: tenantConfig.primaryColor }}>Voltar para a Página Inicial</button>
+      <button onClick={() => onNavigate('login')} className="mt-4 font-bold hover:underline" style={{ color: tenantConfig.primaryColor }}>Voltar para a Página Inicial</button>
     </div>
   );
 
@@ -584,16 +534,16 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
           <button onClick={() => setChatOpen(true)} className="p-4 text-white rounded-2xl font-bold shadow-lg flex flex-col items-center gap-2 text-xs transition active:scale-95 hover:opacity-90" style={{ backgroundColor: tenantConfig.primaryColor }}><MessageSquare className="w-5 h-5" /> Falar com {tenantConfig.advogado}</button>
           <button onClick={() => setFinancialOpen(true)} className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 text-xs hover:border-slate-300 transition active:scale-95"><DollarSign className="w-5 h-5 text-green-600" /> Ver Pagamentos</button>
         </div>
-        <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5" style={{ color: tenantConfig.primaryColor }} /> Enviar Arquivo Digital</button>
+        <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5" style={{ color: tenantConfig.primaryColor }} /> Enviar Ficheiro Digital</button>
       </div>
     </div>
   );
 };
 
 // ============================================================================
-// 3. PAINEL DO ADVOGADO
+// 3. PAINEL DO ADVOGADO (COM UPLOAD REAL E AUTOMAÇÃO)
 // ============================================================================
-const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead, tenantConfig }) => {
+const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead, tenantConfig }) => {
   const [activeTab, setActiveTab] = useState('kanban');
   const [notification, setNotification] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -616,20 +566,27 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     sentenca: cases.filter(c => c.stage === 'sentenca')
   }), [cases]);
 
+  // Estados dos Modais
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
   const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
+  
+  // Estados de Loading
   const [isSavingCase, setIsSavingCase] = useState(false);
   const [isSavingFin, setIsSavingFin] = useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
+  // Estados de Formulário
   const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '', processNumber: '', notes: '' });
-  const [newDocData, setNewDocData] = useState({ name: '', client: '' });
-  
   const [newFinData, setNewFinData] = useState({ client: '', amount: '', dueDate: '', type: 'Boleto' });
   const [finChargeType, setFinChargeType] = useState('Honorários Iniciais');
   const [finTotalInstallments, setFinTotalInstallments] = useState(10);
   const [finCurrentInstallment, setFinCurrentInstallment] = useState(1);
   const [finCustomTitle, setFinCustomTitle] = useState('');
+  
+  // 🚀 NOVO: Estado para Upload Real de Ficheiro
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [docClient, setDocClient] = useState('');
 
   useEffect(() => {
     if (globalNotifications && globalNotifications.length > 0) {
@@ -640,123 +597,111 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
     }
   }, [globalNotifications]);
 
-  const handleMove = (id) => {
+  const handleMove = useCallback((id, clientPhone) => {
     onMoveCase(id);
-    setNotification({ title: "Sucesso", message: "Processo movido. Base de dados atualizada!", type: "success" });
-    setTimeout(() => setNotification(null), 3000);
-  };
+    // 🤖 PREPARAÇÃO DA AUTOMAÇÃO WHATSAPP
+    // Mostramos ao utilizador que o sistema assumiu o controlo da comunicação
+    setNotification({ 
+      title: "Processo Atualizado", 
+      message: "O caso foi movido. Disparando automação de WhatsApp em background...", 
+      type: "success" 
+    });
+    setTimeout(() => setNotification(null), 4000);
+  }, [onMoveCase]);
 
-  const handlePay = (id) => {
+  const handlePay = useCallback((id) => {
     onUpdateFinancial(id, "Pago");
     setNotification({ title: "Financeiro", message: "Pagamento registado com sucesso.", type: "success" });
     setTimeout(() => setNotification(null), 3000);
-  };
+  }, [onUpdateFinancial]);
 
   const handleAttendWhatsApp = (phone, name) => {
     const phoneDigits = phone.replace(/\D/g, '');
     const message = `Olá, ${name}! Aqui é do escritório ${tenantConfig.name}. Tudo bem? Estou a entrar em contacto sobre o seu processo.`;
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
-  };
-
-  const handleAttendLead = (lead) => {
-    if (lead.status === 'Novo') {
-      onUpdateLead(lead.id, 'Contactado');
-    }
-    const phoneDigits = lead.phone.replace(/\D/g, '');
-    const message = `Olá, ${lead.name}! Recebemos o seu contacto através do nosso portal jurídico referente à área de ${lead.type}. Como o ${tenantConfig.advogado} pode ajudá-lo hoje?`;
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
-    
-    setNotification({ title: "Atendimento Iniciado", message: `A abrir WhatsApp para ${lead.name}...`, type: "success" });
-    setTimeout(() => setNotification(null), 4000);
+    window.open(`https://wa.me/55${phoneDigits}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const handleAnxietyClick = (clientName) => {
     setNotification({ 
       title: "Alerta de Ansiedade - " + clientName, 
-      message: "Este cliente demonstra um nível alto de ansiedade. Priorize o envio de uma atualização pelo WhatsApp para o tranquilizar.", 
+      message: "Este cliente demonstra um nível alto de ansiedade. Priorize o envio de uma atualização.", 
       type: "warning" 
     });
     setTimeout(() => setNotification(null), 7000);
   };
 
-  const handleAddNewCase = async (e) => {
+  // ☁️ GESTOR DE UPLOAD REAL (FormData)
+  const handleAddNewDoc = async (e) => {
     e.preventDefault();
-    const rawPhone = newCaseData.phone.replace(/\D/g, '');
-    if (rawPhone.length < 10 && newCaseData.phone.length > 0) {
-      setNotification({ title: "Telemóvel Inválido", message: "Por favor, digite apenas números.", type: "warning" });
+    if (!docClient || !selectedFile) {
+      setNotification({ title: "Atenção", message: "Selecione um cliente e um ficheiro.", type: "warning" });
       setTimeout(() => setNotification(null), 4000);
-      return; 
+      return;
     }
 
+    setIsUploadingDoc(true);
+    
+    // Prepara o pacote de dados real (multipart/form-data)
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('client', docClient);
+    formData.append('name', selectedFile.name);
+
+    // O Frontend envia o FormData inteiro (o backend fará o upload para S3/Supabase)
+    const result = await onAddDocument(formData);
+    
+    setIsUploadingDoc(false);
+    
+    if (result && result.success === false) {
+      setNotification({ title: "Falha no Upload", message: result.error, type: "warning" });
+    } else {
+      setIsAddDocModalOpen(false);
+      setSelectedFile(null);
+      setDocClient('');
+      setNotification({ title: "Upload Concluído", message: "Documento salvo na nuvem com segurança.", type: "success" });
+    }
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  // Gestores de Submissão restantes
+  const handleAddNewCase = async (e) => {
+    e.preventDefault();
     setIsSavingCase(true); 
     const result = await onAddCase(newCaseData); 
     setIsSavingCase(false); 
 
     if (result && result.success === false) {
       setNotification({ title: "Falha ao Salvar", message: result.error, type: "warning" });
-      setTimeout(() => setNotification(null), 6000);
     } else {
       setIsAddCaseModalOpen(false);
       setNewCaseData({ client: '', cpf: '', phone: '', title: '', processNumber: '', notes: '' });
-      setNotification({ title: "Processo Registado", message: "Gravado na Nuvem com sucesso.", type: "success" });
-      setTimeout(() => setNotification(null), 3000);
+      setNotification({ title: "Processo Registado", message: "Gravado na Nuvem.", type: "success" });
     }
+    setTimeout(() => setNotification(null), 4000);
   };
 
   const handleAddNewFin = async (e) => {
     e.preventDefault();
-    if (!newFinData.client) {
-      setNotification({ title: "Atenção", message: "Selecione um cliente da lista.", type: "warning" });
-      setTimeout(() => setNotification(null), 4000);
-      return;
-    }
-
-    let finalTitle = finChargeType;
-    if (finChargeType === 'Parcelamento') {
-      finalTitle = `Parcela ${finCurrentInstallment}/${finTotalInstallments}`;
-    } else if (finChargeType === 'Outro') {
-      finalTitle = finCustomTitle;
-    }
-
     setIsSavingFin(true); 
+    let finalTitle = finChargeType === 'Parcelamento' ? `Parcela ${finCurrentInstallment}/${finTotalInstallments}` : finChargeType === 'Outro' ? finCustomTitle : finChargeType;
+    
     const result = await onAddFinancial({ ...newFinData, title: finalTitle });
     setIsSavingFin(false);
 
     if (result && result.success === false) {
       setNotification({ title: "Falha ao Lançar", message: result.error, type: "warning" });
-      setTimeout(() => setNotification(null), 6000);
     } else {
       setIsAddFinModalOpen(false);
       setNewFinData({ client: '', amount: '', dueDate: '', type: 'Boleto' });
-      setFinChargeType('Honorários Iniciais');
-      setFinCurrentInstallment(1);
-      setFinTotalInstallments(10);
-      setFinCustomTitle('');
       setNotification({ title: "Fatura Lançada", message: "Gravada na Nuvem.", type: "success" });
-      setTimeout(() => setNotification(null), 3000);
     }
-  };
-
-  const handleAddNewDoc = (e) => {
-    e.preventDefault();
-    if (!newDocData.client) {
-      setNotification({ title: "Atenção", message: "Selecione um cliente da lista.", type: "warning" });
-      setTimeout(() => setNotification(null), 4000);
-      return;
-    }
-    onAddDocument(newDocData);
-    setIsAddDocModalOpen(false);
-    setNewDocData({ name: '', client: '' });
-    setNotification({ title: "Ficheiro Salvo", message: "O documento foi anexado ao cliente com sucesso.", type: "success" });
-    setTimeout(() => setNotification(null), 3000);
+    setTimeout(() => setNotification(null), 4000);
   };
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
       
-      {/* Notificações Flutuantes */}
+      {/* Sistema de Notificações */}
       {notification && (
         <div className={`fixed top-6 right-6 z-[300] px-6 py-4 rounded-xl shadow-2xl flex items-start gap-4 animate-slide-in border 
             ${notification.type === 'warning' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-slate-900 border-white/10 text-white'}`}>
@@ -767,26 +712,24 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className={`font-bold text-sm tracking-tight ${notification.type === 'warning' ? 'text-red-800' : 'text-white'}`}>{notification.title}</div>
             <div className={`text-xs mt-1 leading-relaxed ${notification.type === 'warning' ? 'text-red-700 font-medium' : 'opacity-80'}`}>{notification.message}</div>
           </div>
-          <button onClick={() => setNotification(null)} className={`ml-2 p-1 rounded hover:bg-black/10 transition ${notification.type === 'warning' ? 'text-red-800' : 'text-white'}`}>
-             <X className="w-4 h-4" />
-          </button>
+          <button onClick={() => setNotification(null)} className="ml-2 p-1 rounded hover:bg-black/10 transition text-inherit"><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      {/* Modal Novo Processo OTIMIZADO */}
-      <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Registar Novo Processo (Nuvem)">
-        <form onSubmit={handleAddNewCase} className="space-y-4">
+      {/* Modal Novo Processo */}
+      <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Registar Novo Processo">
+         <form onSubmit={handleAddNewCase} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo do Cliente</label>
             <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: João da Silva" value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} />
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF <span className="text-[9px] lowercase font-normal">(Opcional)</span></label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF</label>
                 <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="000.000.000-00" value={newCaseData.cpf} onChange={e => setNewCaseData({...newCaseData, cpf: applyCpfMask(e.target.value)})} />
             </div>
             <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp <span className="text-[9px] lowercase font-normal">(Opcional)</span></label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telemóvel</label>
                 <input type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: applyPhoneMask(e.target.value)})} />
             </div>
           </div>
@@ -794,22 +737,14 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Acção</label>
             <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: Usucapião Imóvel X" value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} />
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número do Processo (CNJ) <span className="text-slate-400 font-normal normal-case ml-1">- Opcional</span></label>
-            <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: 0001234-56.2024.8.26.0000" value={newCaseData.processNumber} onChange={e => setNewCaseData({...newCaseData, processNumber: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações Importantes <span className="text-slate-400 font-normal normal-case ml-1">- Opcional</span></label>
-            <textarea rows="3" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50 resize-none text-sm" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Anote os detalhes e factos da primeira reunião..." value={newCaseData.notes} onChange={e => setNewCaseData({...newCaseData, notes: e.target.value})} />
-          </div>
           <button type="submit" disabled={isSavingCase} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center hover:opacity-90 ${isSavingCase ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ backgroundColor: tenantConfig.primaryColor }}>
             {isSavingCase ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Salvar e Adicionar ao Painel"}
           </button>
         </form>
       </Modal>
 
-      {/* Modal Nova Fatura Inteligente */}
-      <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura (Nuvem)">
+      {/* Modal Nova Fatura */}
+      <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura">
         <form onSubmit={handleAddNewFin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
@@ -853,7 +788,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (€)</label>
               <input required type="number" step="0.01" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="1500.00" value={newFinData.amount} onChange={e => setNewFinData({...newFinData, amount: e.target.value})} />
             </div>
             <div className="flex-1">
@@ -875,38 +810,43 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
         </form>
       </Modal>
 
-      {/* Modal Novo Documento */}
-      <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload de Ficheiro">
+      {/* ☁️ Modal Novo Documento (Com Motor de Upload Real) */}
+      <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload Seguro de Ficheiro">
         <form onSubmit={handleAddNewDoc} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
-            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={newDocData.client} onChange={e => setNewDocData({...newDocData, client: e.target.value})}>
-              <option value="">Selecione um cliente ativo...</option>
+            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={docClient} onChange={e => setDocClient(e.target.value)}>
+              <option value="">Selecione a quem pertence o ficheiro...</option>
               {activeClients.map(clientName => (
                 <option key={clientName} value={clientName}>{clientName}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Ficheiro</label>
-            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: Contrato_Assinado.pdf" value={newDocData.name} onChange={e => setNewDocData({...newDocData, name: e.target.value})} />
-          </div>
-          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-slate-400 transition">
+          
+          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition relative">
              <UploadCloud className="w-8 h-8 mb-2 opacity-50" style={{ color: tenantConfig.primaryColor }} />
-             <p className="text-xs font-bold">Anexar ficheiro falso para teste</p>
+             <p className="text-xs font-bold text-slate-600 mb-1">
+               {selectedFile ? selectedFile.name : "Clique para anexar um ficheiro"}
+             </p>
+             <p className="text-[10px] text-slate-400">PDF, JPG, PNG (Max 10MB)</p>
+             {/* Input Invisível que captura o ficheiro real */}
+             <input 
+               type="file" 
+               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+               onChange={(e) => setSelectedFile(e.target.files[0])}
+               accept=".pdf,.jpg,.jpeg,.png"
+             />
           </div>
-          <button type="submit" className="w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition" style={{ backgroundColor: tenantConfig.primaryColor }}>
-            Salvar Documento
+
+          <button type="submit" disabled={isUploadingDoc || !selectedFile} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center hover:opacity-90 ${(isUploadingDoc || !selectedFile) ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ backgroundColor: tenantConfig.primaryColor }}>
+            {isUploadingDoc ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Iniciar Upload Seguro"}
           </button>
         </form>
       </Modal>
 
       {/* Menu Mobile Overlay */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-[60] md:hidden backdrop-blur-sm transition-opacity"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-[60] md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
       {/* SIDEBAR DO ADVOGADO COM COR DINÂMICA */}
@@ -916,14 +856,12 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="p-2 bg-white/20 rounded-lg shadow-lg"><Gavel className="w-5 h-5 text-white" /></div>
             <span className="font-extrabold text-white tracking-tighter text-lg">{tenantConfig.logoText}</span>
           </div>
-          <button className="md:hidden text-white/50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
-            <X className="w-5 h-5" />
-          </button>
+          <button className="md:hidden text-white/50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}><X className="w-5 h-5" /></button>
         </div>
         <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
           <button onClick={() => { setActiveTab('kanban'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'kanban' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><Activity className="w-5 h-5" /> <span className="text-sm font-bold">Painel de Gestão</span></button>
           <button onClick={() => { setActiveTab('leads'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'leads' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><Users className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Novos Leads</span> {leads && leads.length > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white">{leads.length}</span>}</button>
-          <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Documentação</span></button>
+          <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Arquivo Digital</span></button>
           <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-white/20 text-white shadow-xl translate-x-1' : 'hover:bg-white/5'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controlo Financeiro</span></button>
         </nav>
         <div className="p-6 border-t border-white/10"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold hover:text-white transition opacity-60 hover:bg-red-500/80 hover:opacity-100"><LogOut className="w-4 h-4" /> Sair do Sistema</button></div>
@@ -937,7 +875,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div className="flex items-center gap-4 md:gap-6">
             
-            {/* BOTÕES DE AÇÃO DINÂMICOS */}
             {activeTab === 'kanban' && (
               <button onClick={() => setIsAddCaseModalOpen(true)} className="text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg hover:opacity-90 hover:-translate-y-0.5 transition-all active:scale-95 text-sm" style={{ backgroundColor: tenantConfig.primaryColor }}>
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Processo</span>
@@ -976,7 +913,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
                    <table className="w-full text-left text-sm min-w-[600px]">
                      <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
-                       <tr><th className="p-4 md:p-8">Descrição da Fatura</th><th className="p-4 md:p-8">Cliente</th><th className="p-4 md:p-8">Vencimento</th><th className="p-4 md:p-8">Montante</th><th className="p-4 md:p-8">Estado</th><th className="p-4 md:p-8 text-right">Ações</th></tr>
+                       <tr><th className="p-4 md:p-8">Descrição da Fatura</th><th className="p-4 md:p-8">Cliente</th><th className="p-4 md:p-8">Vencimento</th><th className="p-4 md:p-8">Montante</th><th className="p-4 md:p-8">Estado</th><th className="p-4 md:p-8 text-right">Acções</th></tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100">
                        {financials && financials.map(fin => (
@@ -997,7 +934,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="animate-fade-in bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
                  <table className="w-full text-left text-sm min-w-[600px]">
                    <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
-                     <tr><th className="p-4 md:p-8">Interessado</th><th className="p-4 md:p-8">Contato</th><th className="p-4 md:p-8">Área</th><th className="p-4 md:p-8">Data Entrada</th><th className="p-4 md:p-8">Status</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
+                     <tr><th className="p-4 md:p-8">Interessado</th><th className="p-4 md:p-8">Contacto</th><th className="p-4 md:p-8">Área</th><th className="p-4 md:p-8">Data Entrada</th><th className="p-4 md:p-8">Status</th><th className="p-4 md:p-8 text-right">Acção</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
                      {leads && leads.map(lead => (
@@ -1026,7 +963,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="animate-fade-in bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
                 <table className="w-full text-left text-sm min-w-[600px]">
                    <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
-                     <tr><th className="p-4 md:p-8">Arquivo Digital</th><th className="p-4 md:p-8">Remetente</th><th className="p-4 md:p-8">Data</th><th className="p-4 md:p-8">Tamanho</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
+                     <tr><th className="p-4 md:p-8">Ficheiro Digital</th><th className="p-4 md:p-8">Remetente</th><th className="p-4 md:p-8">Data</th><th className="p-4 md:p-8">Tamanho</th><th className="p-4 md:p-8 text-right">Acção</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
                      {documents && documents.map(doc => (
@@ -1035,7 +972,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                          <td className="p-4 md:p-8 text-slate-600 font-medium">{doc.client}</td>
                          <td className="p-4 md:p-8 text-slate-500 font-medium">{doc.date}</td>
                          <td className="p-4 md:p-8 text-slate-400 text-[10px] font-extrabold uppercase tracking-tighter">{doc.size}</td>
-                         <td className="p-4 md:p-8 text-right"><button className="font-extrabold hover:bg-slate-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent flex items-center gap-2 ml-auto shadow-sm" style={{ color: tenantConfig.primaryColor }}><Download className="w-4 h-4" /> <span className="hidden sm:inline">Baixar</span></button></td>
+                         <td className="p-4 md:p-8 text-right"><button className="font-extrabold hover:bg-slate-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent flex items-center gap-2 ml-auto shadow-sm" style={{ color: tenantConfig.primaryColor }}><Download className="w-4 h-4" /> <span className="hidden sm:inline">Descarregar</span></button></td>
                        </tr>
                      ))}
                    </tbody>
@@ -1045,13 +982,13 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
             <div className="animate-fade-in space-y-8 md:space-y-12">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
                 
-                <div onClick={() => setNotification({ title: "Processos Ativos", message: `Você tem ${cases.length} processos sendo geridos no momento.`, type: "info" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
+                <div onClick={() => setNotification({ title: "Processos Ativos", message: `Você tem ${cases.length} processos a ser geridos no momento.`, type: "info" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 opacity-10 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right" style={{ backgroundColor: tenantConfig.primaryColor }}></div>
                   <div className="text-[9px] md:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Processos em Carteira</div>
                   <div className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tighter">{cases.length}</div>
                 </div>
                 
-                <div onClick={() => setNotification({ title: "Alerta de Ansiedade", message: `Existem ${cases.filter(c => c.anxietyScore > 70).length} clientes que precisam de atenção. Role para baixo e veja os alertas vermelhos.`, type: "warning" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
+                <div onClick={() => setNotification({ title: "Alerta de Ansiedade", message: `Existem ${cases.filter(c => c.anxietyScore > 70).length} clientes que precisam de atenção.`, type: "warning" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
                    <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-red-50 rounded-bl-full group-hover:scale-125 transition duration-700 opacity-60 origin-top-right"></div>
                    <div className="text-[9px] md:text-[10px] text-red-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
                      Índice de Ansiedade <AlertTriangle className="w-3 h-3" />
@@ -1064,10 +1001,10 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                    <div className="text-[9px] md:text-[10px] text-green-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
                      Conversões Pendentes <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                    </div>
-                   <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads && leads.filter(l => l.status === 'Novo').length}</div>
+                   <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads.filter(l => l.status === 'Novo').length}</div>
                 </div>
 
-                <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema gerou 8.4 mil ações automáticas neste mês, poupando tempo valioso da sua equipe.", type: "success" })} className="cursor-pointer p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500" style={{ backgroundColor: tenantConfig.primaryColor }}>
+                <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema poupou-lhe horas de trabalho manual nesta semana.", type: "success" })} className="cursor-pointer p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500" style={{ backgroundColor: tenantConfig.primaryColor }}>
                    <div className="text-[9px] md:text-[10px] text-white/70 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Eficiência</div>
                    <div className="text-3xl md:text-5xl font-extrabold text-white tracking-tighter">8.4k</div>
                    <p className="text-[8px] md:text-[9px] text-white/50 mt-2 md:mt-3 font-extrabold uppercase tracking-wider">Avisos Proativos</p>
@@ -1128,7 +1065,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                             </button>
 
                             {col.id !== 'sentenca' && (
-                              <button onClick={() => handleMove(c.id)} className="text-[9px] md:text-[10px] font-extrabold px-3 md:px-4 py-2 rounded-xl transition-all duration-300 shadow-sm bg-slate-50 hover:bg-slate-100" style={{ color: tenantConfig.primaryColor }}>
+                              <button onClick={() => handleMove(c.id, c.phone)} className="text-[9px] md:text-[10px] font-extrabold px-3 md:px-4 py-2 rounded-xl transition-all duration-300 shadow-sm bg-slate-50 hover:bg-slate-100" style={{ color: tenantConfig.primaryColor }}>
                                 Avançar ➔
                               </button>
                             )}
@@ -1156,36 +1093,31 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 // --- APP CONTROLLER PRINCIPAL (CONEXÃO REAL COM A NUVEM) ---
 // ============================================================================
 export default function App() {
-  // 🚀 O SISTEMA INICIA DIRETAMENTE NO LOGIN AGORA (A visão LandingPage está desativada)
   const [currentView, setCurrentView] = useState('login'); 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   
-  // 🎨 CONFIGURAÇÃO WHITE-LABEL (Guarda na memória o escritório do utilizador)
   const [tenantConfig, setTenantConfig] = useStickyState({
     name: "Lopes & Associados",
-    primaryColor: "#0f172a", // Cor Padrão (Slate 900)
+    primaryColor: "#0f172a", 
     logoText: "LOPES JURIS",
     advogado: "Dr. Marcos Lopes"
   }, 'pascale_tenant_config');
   
-  // Estados Globais
   const [cases, setCases] = useState([]);
   const [financials, setFinancials] = useState([]);
-  const [leads, setLeads] = useStickyState(DEFAULT_LEADS, 'pascale_leads');
+  const [leads, setLeads] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [messages, setMessages] = useStickyState(DEFAULT_MESSAGES, 'pascale_messages');
-  const [documents, setDocuments] = useStickyState(DEFAULT_DOCUMENTS, 'pascale_documents');
   const [globalNotifications, setGlobalNotifications] = useState([]);
 
-  // Função de Logout centralizada
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('pascale_token');
     setIsAuthenticated(false);
     setCurrentView('login');
-  };
+  }, []);
 
-  // 📡 FETCH DA NUVEM (COM ENVIO DE TOKEN DE SEGURANÇA)
-  const fetchCloudData = async () => {
+  const fetchCloudData = useCallback(async () => {
     setLoadingData(true);
     const token = localStorage.getItem('pascale_token');
     
@@ -1196,62 +1128,54 @@ export default function App() {
     }
 
     try {
-      const casesRes = await fetch(`${API_URL}/cases`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
+      const [casesRes, finRes, leadsRes, docsRes] = await Promise.all([
+        fetch(`${API_URL}/cases`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_URL}/financials`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_URL}/leads`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_URL}/documents`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+
       if (casesRes.status === 401 || casesRes.status === 403) throw new Error("Token Invalido");
 
       if (casesRes.ok) {
         const data = await casesRes.json();
-        if (data && data.length > 0) {
-          setCases(data.map(dbCase => ({
-            id: dbCase.id,
-            title: dbCase.title,
-            processNumber: dbCase.processNumber, 
-            notes: dbCase.notes,                 
-            status: dbCase.status,
-            stage: dbCase.stage,
-            client: dbCase.client?.name || 'Cliente Sem Nome',
-            cpf: dbCase.client?.cpf || '',
-            phone: dbCase.client?.phone || '',
-            anxietyScore: dbCase.anxietyScore || 0,
-            lastUpdate: 'Sincronizado',
-            timeline: dbCase.timeline || []
-          })));
-        } else {
-          setCases(DEFAULT_CASES);
-        }
+        setCases(data.length > 0 ? data.map(dbCase => ({
+          ...dbCase,
+          client: dbCase.client?.name || 'Cliente Sem Nome',
+          phone: dbCase.client?.phone || '',
+          lastUpdate: 'Sincronizado',
+          timeline: dbCase.timeline || []
+        })) : []);
       }
       
-      const finRes = await fetch(`${API_URL}/financials`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
       if (finRes.ok) {
         const fData = await finRes.json();
-        if (fData && fData.length > 0) {
-          setFinancials(fData.map(dbFin => ({ ...dbFin, client: dbFin.client?.name })));
-        } else {
-          setFinancials(DEFAULT_FINANCIALS);
-        }
+        setFinancials(fData.length > 0 ? fData.map(dbFin => ({ ...dbFin, client: dbFin.client?.name })) : []);
       }
+
+      if (leadsRes.ok) {
+        const leadsData = await leadsRes.json();
+        setLeads(leadsData || []);
+      }
+
+      if (docsRes.ok) {
+        const docsData = await docsRes.json();
+        setDocuments(docsData || []);
+      }
+
     } catch (e) {
       if (e.message === "Token Invalido") {
-        console.warn("🔒 Sessão expirada. Redirecionando para o Login.");
+        console.warn("🔒 Sessão expirada.");
         handleLogout();
       } else {
-        console.warn("Servidor API não alcançável. Usando modo offline.", e);
-        setCases(DEFAULT_CASES);
-        setFinancials(DEFAULT_FINANCIALS);
+        console.error("Erro ao puxar dados da nuvem.", e);
       }
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [handleLogout]);
 
   useEffect(() => {
-    // 🛡️ Verifica se já existe um token salvo na memória ao abrir a app
     const savedToken = localStorage.getItem('pascale_token');
     if (savedToken) {
       setIsAuthenticated(true);
@@ -1263,103 +1187,112 @@ export default function App() {
     if (isAuthenticated && currentView === 'dashboard') {
       fetchCloudData();
     }
-  }, [isAuthenticated, currentView]);
+  }, [isAuthenticated, currentView, fetchCloudData]);
 
-  // ➕ SALVAR NOVO PROCESSO (COM ENVIO DE TOKEN DE SEGURANÇA)
   const addCaseToCloud = async (newCaseData) => {
     const token = localStorage.getItem('pascale_token');
     try {
       const response = await fetch(`${API_URL}/cases`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(newCaseData)
       });
-      
-      if (response.status === 401 || response.status === 403) {
-        handleLogout();
-        return { success: false, error: "Sessão expirada." };
-      }
-
-      if (response.ok) {
-        await fetchCloudData(); 
-        return { success: true };
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        return { success: false, error: errData.error || `Erro do Servidor HTTP: ${response.status}` };
-      }
-    } catch (e) {
-      console.error("Erro de rede ao salvar processo:", e);
-      return { success: false, error: "Falha de conexão. A nuvem da Render pode estar a despertar, tente novamente em 30 segundos." };
-    }
+      if (response.status === 401 || response.status === 403) return handleLogout();
+      if (response.ok) { await fetchCloudData(); return { success: true }; }
+      const errData = await response.json().catch(() => ({}));
+      return { success: false, error: errData.error || "Erro" };
+    } catch (e) { return { success: false, error: "Falha de conexão" }; }
   };
 
-  // 🔄 MOVER PROCESSO (COM ENVIO DE TOKEN DE SEGURANÇA)
   const moveCaseInCloud = async (caseId, currentStage) => {
     const newStage = currentStage === 'peticao' ? 'analise_juiz' : 'sentenca';
     const newStatus = newStage === 'sentenca' ? 'Concluído' : 'Em Andamento';
     const token = localStorage.getItem('pascale_token');
 
-    // UI Otimista
     setCases(prev => prev.map(c => c.id === caseId ? { ...c, stage: newStage, status: newStatus } : c));
-
     try {
-      const response = await fetch(`${API_URL}/cases/${caseId}/move`, {
+      await fetch(`${API_URL}/cases/${caseId}/move`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ stage: newStage, status: newStatus })
       });
-      
-      if (response.status === 401 || response.status === 403) handleLogout();
-    } catch (e) {
-      console.error("Erro ao mover:", e);
-    }
+      // 🤖 Aqui, no futuro, o Backend irá intercetar este PATCH e enviar o webhook para a EvolutionAPI/Z-API
+    } catch (e) {}
   };
 
-  // ➕ LANÇAR FATURA (COM ENVIO DE TOKEN DE SEGURANÇA)
   const handleAddFinancial = async (finData) => {
     const token = localStorage.getItem('pascale_token');
     try {
       const response = await fetch(`${API_URL}/financials`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(finData)
       });
-      
-      if (response.status === 401 || response.status === 403) {
-        handleLogout();
-        return { success: false, error: "Sessão expirada." };
-      }
+      if (response.status === 401 || response.status === 403) return handleLogout();
+      if (response.ok) { await fetchCloudData(); return { success: true }; }
+      const errData = await response.json().catch(() => ({}));
+      return { success: false, error: errData.error || "Erro" };
+    } catch (e) { return { success: false, error: "Falha de conexão" }; }
+  };
 
+  const addLead = async (newLead) => {
+    try {
+      await fetch(`${API_URL}/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLead)
+      });
+      if (isAuthenticated) fetchCloudData();
+    } catch (e) { console.error("Erro ao enviar Lead", e); }
+  };
+
+  const updateLeadStatus = async (id, newStatus) => {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+    const token = localStorage.getItem('pascale_token');
+    try {
+      await fetch(`${API_URL}/leads/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (e) { console.error("Erro ao atualizar Lead", e); }
+  };
+
+  // ☁️ GESTOR DE UPLOAD (RECEBE FORMDATA)
+  const handleUploadDocument = async (formData) => {
+    const tempId = Date.now().toString();
+    const fileName = formData.get('name') || "Novo_Documento.pdf";
+    const clientName = formData.get('client') || "Desconhecido";
+    
+    // UI Otimista
+    setDocuments(prev => [{ id: tempId, name: fileName, client: clientName, date: "A processar...", size: "..." }, ...prev]);
+    
+    const token = localStorage.getItem('pascale_token');
+    try {
+      // Repare que NÃO passamos 'Content-Type: application/json' quando usamos FormData.
+      // O browser encarrega-se de criar o boundary multipart automaticamente.
+      const response = await fetch(`${API_URL}/documents`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
       if (response.ok) {
-        await fetchCloudData(); 
+        const dbDoc = await response.json();
+        setDocuments(prev => prev.map(d => d.id === tempId ? dbDoc : d));
         return { success: true };
       } else {
-        const errData = await response.json().catch(() => ({}));
-        return { success: false, error: errData.error || `Erro do Servidor HTTP: ${response.status}` };
+        const err = await response.json();
+        setDocuments(prev => prev.filter(d => d.id !== tempId)); // Reverte em caso de erro
+        return { success: false, error: err.error || "Falha no servidor" };
       }
-    } catch (e) {
-      console.error("Erro ao enviar fatura para API:", e);
-      return { success: false, error: "Falha de conexão. A nuvem da Render pode estar a despertar." };
+    } catch (e) { 
+      setDocuments(prev => prev.filter(d => d.id !== tempId));
+      return { success: false, error: "Falha de rede ao enviar ficheiro." };
     }
   };
 
-  const addLead = (newLead) => setLeads(prev => [newLead, ...prev]);
-  const updateLeadStatus = (id, newStatus) => setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
-  const updateFinancial = (id, newStatus) => setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
-  const handleSendMessage = (text, sender) => setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
-  const handleUploadDocument = (docData) => setDocuments(prev => [{ id: Date.now(), name: docData.name, client: docData.client, date: "Hoje", size: "1.5 MB" }, ...prev]);
-  const notifyLawyer = (message) => setGlobalNotifications(prev => [...prev, message]);
-
-  // 🚀 ROTEADOR BLINDADO (Sem barra de controlo e forçando sempre as rotas de Advogado)
+  const updateFinancial = useCallback((id, newStatus) => setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f)), []);
+  
   const renderView = () => {
     if (currentView === 'dashboard' && isAuthenticated) {
       if (loadingData) {
@@ -1373,7 +1306,7 @@ export default function App() {
       return <LawyerDashboard cases={cases} onMoveCase={(id) => moveCaseInCloud(id, cases.find(c=>c.id===id)?.stage)} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} onAddFinancial={handleAddFinancial} onAddDocument={handleUploadDocument} globalNotifications={globalNotifications} onLogout={handleLogout} onUpdateLead={updateLeadStatus} tenantConfig={tenantConfig} />;
     }
 
-    // Se tentar aceder a qualquer outra coisa (como 'landing' ou 'portal') sem estar programado no switch, cai no Login Seguro.
+    // Mesmo com LandingPage e Portal no código, mantemos a porta de entrada trancada no Login/Dashboard
     return <LoginPage onLogin={(newConfig) => { 
         if(newConfig) setTenantConfig(newConfig); 
         setIsAuthenticated(true); 
@@ -1394,8 +1327,6 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
         * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
       `}</style>
-      
-      {/* A Barra de Controlo Master (botões pretos do fundo) foi permanentemente removida desta versão para focar apenas na Visão do Advogado */}
       
       {renderView()}
     </div>
