@@ -130,14 +130,22 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
 
 // ============================================================================
-// 0. PÁGINA DE LOGIN (COM AUTENTICAÇÃO REAL E CORES DINÂMICAS)
+// 0. PÁGINA DE LOGIN E REGISTO (UX SaaS Enterprise)
 // ============================================================================
 const LoginPage = ({ onLogin, tenantConfig }) => {
+  // 🚀 ESTADO NOVO: Controla se a tela mostra Login ou Registo
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  
+  // Campos do formulário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [officeName, setOfficeName] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(''); 
 
+  // FUNÇÃO: Faz Login
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -155,10 +163,9 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
       if (response.ok) {
         localStorage.setItem('pascale_token', data.token);
         
-        // 🎨 CRIA A IDENTIDADE VISUAL DINÂMICA
         const lastName = data.lawyer.name.split(' ').pop().toUpperCase();
         const dynamicConfig = {
-          name: `${data.lawyer.name} & Associados`,
+          name: data.lawyer.officeName || `${data.lawyer.name} & Associados`,
           primaryColor: data.lawyer.primaryColor || '#0f172a',
           logoText: `${lastName} JURIS`,
           advogado: data.lawyer.name
@@ -175,45 +182,102 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
     }
   };
 
+  // FUNÇÃO: Regista Novo Utilizador e faz Auto-Login
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      // Vai bater na rota que iremos criar no backend
+      const response = await fetch(`${API_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, officeName })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Auto-Login Imediato!
+        localStorage.setItem('pascale_token', data.token);
+        
+        const lastName = data.lawyer.name.split(' ').pop().toUpperCase();
+        const dynamicConfig = {
+          name: data.lawyer.officeName || `${data.lawyer.name} & Associados`,
+          primaryColor: data.lawyer.primaryColor || '#0f172a',
+          logoText: `${lastName} JURIS`,
+          advogado: data.lawyer.name
+        };
+
+        onLogin(dynamicConfig); 
+      } else {
+        setErrorMsg(data.error || "Erro ao criar conta.");
+      }
+    } catch (err) {
+      setErrorMsg("Erro de comunicação com o servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-        <div className="p-8 text-center transition-colors duration-500" style={{ backgroundColor: tenantConfig.primaryColor }}>
+      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up transition-all duration-300">
+        
+        {/* Cabeçalho Dinâmico */}
+        <div className="p-8 text-center transition-colors duration-500 relative" style={{ backgroundColor: isRegisterMode ? '#0f172a' : tenantConfig.primaryColor }}>
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-inner">
-            <Gavel className="w-8 h-8" />
+            {isRegisterMode ? <ShieldCheck className="w-8 h-8" /> : <Gavel className="w-8 h-8" />}
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">{tenantConfig.logoText}</h1>
-          <p className="text-white/70 text-xs font-bold uppercase tracking-widest mt-2">Acesso Restrito</p>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">
+            {isRegisterMode ? "PASCALE JURIS" : tenantConfig.logoText}
+          </h1>
+          <p className="text-white/70 text-xs font-bold uppercase tracking-widest mt-2">
+            {isRegisterMode ? "Criar o seu Escritório" : "Acesso Restrito"}
+          </p>
         </div>
+
         <div className="p-8">
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Corporativo</label>
-              <input 
-                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 outline-none transition-shadow" 
-                style={{ '--tw-ring-color': tenantConfig.primaryColor }}
-                placeholder="admin@lopes.pt"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
-              <input 
-                type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 outline-none transition-shadow" 
-                style={{ '--tw-ring-color': tenantConfig.primaryColor }}
-                placeholder="••••••••"
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={loading} 
-              style={{ backgroundColor: tenantConfig.primaryColor }}
-              className="w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-opacity flex justify-center items-center"
-            >
-              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Acessar o Sistema"}
-            </button>
-          </form>
+          {/* Alterna entre o formulário de Login e o de Registo */}
+          {isRegisterMode ? (
+            <form onSubmit={handleRegister} className="space-y-4 animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Seu Nome Completo</label>
+                <input required autoFocus value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-shadow bg-slate-50" placeholder="Ex: Dr. João Silva" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Escritório</label>
+                <input required value={officeName} onChange={(e) => setOfficeName(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-shadow bg-slate-50" placeholder="Ex: Silva & Associados" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Profissional</label>
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-shadow bg-slate-50" placeholder="joao@advocacia.com" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Criar Senha</label>
+                <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-shadow bg-slate-50" placeholder="Mínimo 6 caracteres" />
+              </div>
+              
+              <button type="submit" disabled={loading} className="w-full py-3 bg-slate-900 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-opacity flex justify-center items-center mt-2">
+                {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Criar Conta Segura"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-4 animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Corporativo</label>
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 outline-none transition-shadow bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="admin@lopes.pt" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 outline-none transition-shadow bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="••••••••" />
+              </div>
+              <button type="submit" disabled={loading} style={{ backgroundColor: tenantConfig.primaryColor }} className="w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-opacity flex justify-center items-center">
+                {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Acessar o Sistema"}
+              </button>
+            </form>
+          )}
 
           {errorMsg && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-lg text-center animate-fade-in flex items-center justify-center gap-2">
@@ -221,9 +285,17 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
             </div>
           )}
 
-          <div className="mt-4 text-center">
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Software as a Service</p>
+          {/* BOTÃO DE ALTERNÂNCIA ESTRATÉGICA */}
+          <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+            <button 
+              type="button"
+              onClick={() => { setIsRegisterMode(!isRegisterMode); setErrorMsg(''); }} 
+              className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
+            >
+              {isRegisterMode ? "Já tem uma conta? Faça Login aqui" : "Ainda não tem conta? Crie o seu Escritório"}
+            </button>
           </div>
+
         </div>
       </div>
     </div>
@@ -1262,7 +1334,7 @@ export default function App() {
     setCurrentView('login');
   };
 
-  // 🚀 ROTEADOR COM INJEÇÃO DE COR DINÂMICA
+  // 🚀 ROTEADOR COM INJEÇÃO DE COR DINÂMICA E TELA DE REGISTO
   const renderView = () => {
     if (currentView === 'dashboard' && isAuthenticated) {
       if (loadingData) {
