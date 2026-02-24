@@ -19,6 +19,8 @@ model Lawyer {
   primaryColor  String    @default("#4f46e5")
   clients       Client[]
   cases         Case[]
+  leads         Lead[]
+  documents     Document[]
   createdAt     DateTime  @default(now())
 
   // Boa prática: Força o nome da tabela em minúsculas e no plural no banco de dados real
@@ -58,9 +60,6 @@ model Client {
 model Case {
   id            String         @id @default(uuid())
   title         String
-  // NOVOS CAMPOS ADICIONADOS
-  processNumber String?        // Opcional: Número CNJ do processo
-  notes         String?
   status        String         @default("Em Andamento")
   stage         String         @default("peticao")
   anxietyScore  Int            @default(50)
@@ -112,4 +111,35 @@ model Financial {
   @@index([dueDate(sort: Asc)]) 
   @@index([clientId])
   @@map("financials")
+}
+
+model Lead {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  type      String
+  status    String   @default("Novo")
+  date      String   @default("Hoje")
+  createdAt DateTime @default(now())
+
+  lawyer    Lawyer   @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+  lawyerId  String
+
+  @@index([lawyerId])
+  @@map("leads")
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  name      String
+  client    String
+  size      String   @default("1.5 MB")
+  date      String   @default("Hoje")
+  createdAt DateTime @default(now())
+
+  lawyer    Lawyer   @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+  lawyerId  String
+
+  @@index([lawyerId])
+  @@map("documents")
 }

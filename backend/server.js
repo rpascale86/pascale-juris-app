@@ -30,11 +30,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'pascale_secret_key_2024';
 // ============================================================================
 // --- 🛡️ MIDDLEWARE DE SEGURANÇA (A FRONTEIRA INVISÍVEL) ---
 // ============================================================================
-// Esta função verifica se o utilizador enviou um Token válido antes de 
-// o deixar aceder aos dados da base de dados.
+// Verifica se o utilizador enviou um Token válido antes de dar acesso aos dados
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Formato esperado: "Bearer TOKEN_AQUI"
+  const token = authHeader && authHeader.split(' ')[1]; // Esperado: "Bearer TOKEN"
 
   if (token == null) {
     return res.status(401).json({ error: 'Acesso negado. Token de segurança não fornecido.' });
@@ -43,8 +42,7 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Token inválido ou expirado. Faça login novamente.' });
     
-    // Se o token for válido, guardamos os dados do advogado (incluindo o lawyerId)
-    // na variável `req.user` para a usarmos nas rotas seguintes.
+    // Guarda os dados do advogado no request para isolar os dados
     req.user = user;
     next();
   });
@@ -58,7 +56,7 @@ app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email e palavra-passe são obrigatórios.' });
+    return res.status(400).json({ error: 'E-mail e palavra-passe são obrigatórios.' });
   }
 
   try {
@@ -72,7 +70,7 @@ app.post('/api/login', async (req, res) => {
 
     let passwordMatch = false;
     
-    // Suporte para contas antigas vs contas novas encriptadas
+    // Compatibilidade com senhas antigas e novas (Bcrypt)
     if (lawyer.password.startsWith('$2b$')) {
         passwordMatch = await bcrypt.compare(password, lawyer.password);
     } else {
@@ -83,7 +81,7 @@ app.post('/api/login', async (req, res) => {
                 where: { id: lawyer.id },
                 data: { password: hashedPassword }
             });
-            console.log(`🔐 Senha da conta ${email} foi encriptada em background com sucesso.`);
+            console.log(`🔐 Palavra-passe da conta ${email} encriptada com sucesso.`);
         }
     }
 
@@ -91,7 +89,6 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
-    // O Token agora carrega o ID do Advogado para isolamento de dados!
     const token = jwt.sign(
       { lawyerId: lawyer.id, email: lawyer.email, name: lawyer.name },
       JWT_SECRET,
@@ -177,10 +174,24 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// CAPTURA PÚBLICA DE LEADS (Landing Page)
 app.post('/api/leads', async (req, res) => {
   const { name, phone, type } = req.body;
-  console.log(`🚀 NOVO LEAD CAPTURADO: ${name} (${type}) - ${phone}`);
-  res.status(201).json({ message: 'Lead recebido com sucesso' });
+  try {
+    // MVP: Como a Landing Page pública não tem um Tenant específico ainda,
+    // enviamos o Lead para o primeiro advogado da base (Admin principal).
+    const lawyer = await prisma.lawyer.findFirst();
+    if (!lawyer) return res.status(400).json({ error: 'Nenhum advogado encontrado.' });
+
+    const newLead = await prisma.lead.create({
+      data: { name, phone, type, date: "Hoje", lawyerId: lawyer.id }
+    });
+    console.log(`🚀 NOVO LEAD CAPTURADO: ${name} (${type}) - ${phone}`);
+    res.status(201).json(newLead);
+  } catch (e) {
+    console.error("Erro ao guardar lead:", e);
+    res.status(500).json({ error: 'Erro ao guardar lead' });
+  }
 });
 
 app.get('/', (req, res) => {
@@ -189,14 +200,14 @@ app.get('/', (req, res) => {
 
 
 // ============================================================================
-// --- 🔒 ROTAS PRIVADAS (EXIGEM TOKEN E ISOLAM OS DADOS POR ESCRITÓRIO) ---
+// --- 🔒 ROTAS PRIVADAS (EXIGEM TOKEN E ISOLAM DADOS POR ESCRITÓRIO) ---
 // ============================================================================
 
-// Repare no "authenticateToken" injetado na rota!
+// --- PROCESSOS ---
 app.get('/api/cases', authenticateToken, async (req, res) => {
   try {
     const cases = await prisma.case.findMany({
-      where: { lawyerId: req.user.lawyerId }, // 🚨 ISOLAMENTO DE DADOS: Apenas do advogado logado!
+      where: { lawyerId: req.user.lawyerId }, // ISOLAMENTO
       include: { client: true, timeline: true },
       orderBy: { updatedAt: 'desc' }, 
       take: 200 
@@ -208,53 +219,9 @@ app.get('/api/cases', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/financials', authenticateToken, async (req, res) => {
-  try {
-    const financials = await prisma.financial.findMany({
-      where: { client: { lawyerId: req.user.lawyerId } }, // 🚨 ISOLAMENTO DE DADOS: Apenas faturas dos seus clientes
-      include: { client: true },
-      orderBy: { dueDate: 'asc' }
-    });
-    res.json(financials);
-  } catch (error) {
-    console.error("Erro no financeiro:", error);
-    res.status(500).json({ error: 'Erro interno ao procurar financeiro' });
-  }
-});
-
-app.patch('/api/cases/:id/move', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const { stage, status } = req.body;
-
-  if (!stage || !status) {
-    return res.status(400).json({ error: 'Faltam parâmetros obrigatórios.' });
-  }
-
-  try {
-    // Verifica se o processo pertence de facto ao advogado que tentou movê-lo
-    const existingCase = await prisma.case.findFirst({
-      where: { id: id, lawyerId: req.user.lawyerId }
-    });
-
-    if (!existingCase) {
-      return res.status(403).json({ error: 'Acesso não autorizado a este processo.' });
-    }
-
-    const updatedCase = await prisma.case.update({
-      where: { id },
-      data: { stage, status }
-    });
-    console.log(`✅ Processo ${id} movido para: ${stage} pelo advogado ${req.user.name}`);
-    res.json(updatedCase);
-  } catch (error) {
-    console.error("Erro ao mover processo:", error);
-    res.status(500).json({ error: 'Erro ao atualizar processo na base de dados.' });
-  }
-});
-
 app.post('/api/cases', authenticateToken, async (req, res) => {
   const { client, cpf, phone, title, processNumber, notes } = req.body;
-  const lawyerId = req.user.lawyerId; // 🚨 Puxamos o ID do dono da conta através do Token JWT
+  const lawyerId = req.user.lawyerId; 
 
   if (!client || !title) {
     return res.status(400).json({ error: 'Nome do cliente e título da acção são obrigatórios.' });
@@ -262,7 +229,7 @@ app.post('/api/cases', authenticateToken, async (req, res) => {
 
   try {
     if (cpf) {
-      const cpfExists = await prisma.client.findFirst({ where: { cpf: cpf } });
+      const cpfExists = await prisma.client.findFirst({ where: { cpf: cpf, lawyerId: lawyerId } });
       if (cpfExists && cpfExists.name !== client) {
         return res.status(400).json({ 
           error: `Este CPF já está associado ao cliente "${cpfExists.name}". Não é possível duplicar cadastros.` 
@@ -270,29 +237,20 @@ app.post('/api/cases', authenticateToken, async (req, res) => {
       }
     }
 
-    // Procura o cliente atrelado a ESTE advogado especificamente
     let dbClient = await prisma.client.findFirst({ 
       where: { name: client, lawyerId: lawyerId } 
     });
 
     if (!dbClient) {
       dbClient = await prisma.client.create({
-        data: { 
-          name: client, 
-          cpf: cpf || null, 
-          phone: phone || '', 
-          lawyerId: lawyerId // Atribui o cliente a este advogado
-        }
+        data: { name: client, cpf: cpf || null, phone: phone || '', lawyerId: lawyerId }
       });
-      console.log(`👤 Novo cliente registado: ${client} (CPF: ${cpf}) para o escritório ${req.user.name}`);
+      console.log(`👤 Novo cliente registado: ${client}`);
     } else {
       if ((cpf && !dbClient.cpf) || (phone && !dbClient.phone)) {
         await prisma.client.update({
           where: { id: dbClient.id },
-          data: { 
-            ...(cpf && !dbClient.cpf ? { cpf } : {}),
-            ...(phone && !dbClient.phone ? { phone } : {})
-          }
+          data: { ...(cpf && !dbClient.cpf ? { cpf } : {}), ...(phone && !dbClient.phone ? { phone } : {}) }
         });
       }
     }
@@ -306,7 +264,7 @@ app.post('/api/cases', authenticateToken, async (req, res) => {
         status: "Novo",
         anxietyScore: 0,
         clientId: dbClient.id,
-        lawyerId: lawyerId, // Atribui o processo a este advogado
+        lawyerId: lawyerId, 
       },
       include: { client: true, timeline: true }
     });
@@ -318,22 +276,56 @@ app.post('/api/cases', authenticateToken, async (req, res) => {
   }
 });
 
+app.patch('/api/cases/:id/move', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { stage, status } = req.body;
+
+  if (!stage || !status) return res.status(400).json({ error: 'Faltam parâmetros obrigatórios.' });
+
+  try {
+    const existingCase = await prisma.case.findFirst({
+      where: { id: id, lawyerId: req.user.lawyerId }
+    });
+
+    if (!existingCase) return res.status(403).json({ error: 'Acesso não autorizado a este processo.' });
+
+    const updatedCase = await prisma.case.update({
+      where: { id },
+      data: { stage, status }
+    });
+    console.log(`✅ Processo ${id} movido para: ${stage}`);
+    res.json(updatedCase);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar processo.' });
+  }
+});
+
+// --- FINANCEIRO ---
+app.get('/api/financials', authenticateToken, async (req, res) => {
+  try {
+    const financials = await prisma.financial.findMany({
+      where: { client: { lawyerId: req.user.lawyerId } }, 
+      include: { client: true },
+      orderBy: { dueDate: 'asc' }
+    });
+    res.json(financials);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno ao procurar financeiro' });
+  }
+});
+
 app.post('/api/financials', authenticateToken, async (req, res) => {
   const { title, client, amount, dueDate, type } = req.body;
   const lawyerId = req.user.lawyerId;
 
-  if (!title || !client || amount === undefined) {
-    return res.status(400).json({ error: 'Dados financeiros incompletos.' });
-  }
+  if (!title || !client || amount === undefined) return res.status(400).json({ error: 'Dados financeiros incompletos.' });
 
   try {
     const dbClient = await prisma.client.findFirst({
-      where: { name: client, lawyerId: lawyerId } // Procura o cliente APENAS neste escritório
+      where: { name: client, lawyerId: lawyerId } 
     });
 
-    if (!dbClient) {
-      return res.status(404).json({ error: 'Cliente não encontrado no seu sistema.' });
-    }
+    if (!dbClient) return res.status(404).json({ error: 'Cliente não encontrado no seu sistema.' });
 
     const newFinancial = await prisma.financial.create({
       data: {
@@ -348,8 +340,70 @@ app.post('/api/financials', authenticateToken, async (req, res) => {
 
     res.status(201).json(newFinancial);
   } catch (error) {
-    console.error("Erro ao lançar fatura:", error);
-    res.status(500).json({ error: 'Erro interno ao guardar a fatura.' });
+    res.status(500).json({ error: 'Erro ao guardar a fatura.' });
+  }
+});
+
+// --- LEADS ---
+app.get('/api/leads', authenticateToken, async (req, res) => {
+  try {
+    const leads = await prisma.lead.findMany({
+      where: { lawyerId: req.user.lawyerId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(leads);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao procurar leads.' });
+  }
+});
+
+app.patch('/api/leads/:id/status', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    const existingLead = await prisma.lead.findFirst({
+      where: { id: id, lawyerId: req.user.lawyerId }
+    });
+    if (!existingLead) return res.status(403).json({ error: 'Acesso não autorizado a este lead.' });
+
+    const updated = await prisma.lead.update({
+      where: { id: id },
+      data: { status }
+    });
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao atualizar status do lead.' });
+  }
+});
+
+// --- DOCUMENTOS ---
+app.get('/api/documents', authenticateToken, async (req, res) => {
+  try {
+    const docs = await prisma.document.findMany({
+      where: { lawyerId: req.user.lawyerId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(docs);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao procurar documentos.' });
+  }
+});
+
+app.post('/api/documents', authenticateToken, async (req, res) => {
+  const { name, client } = req.body;
+  try {
+    const newDoc = await prisma.document.create({
+      data: {
+        name,
+        client,
+        size: "1.5 MB", // Placeholder enquanto não há upload real (S3)
+        date: "Hoje",
+        lawyerId: req.user.lawyerId
+      }
+    });
+    res.status(201).json(newDoc);
+  } catch(e) {
+    res.status(500).json({ error: 'Erro ao guardar documento.' });
   }
 });
 
