@@ -227,7 +227,7 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
 
 
 // ============================================================================
-// 1. LANDING PAGE (SITE PÚBLICO) - CÓDIGO COMPLETO (DESATIVADO NA NAVEGAÇÃO PELA APP)
+// 1. LANDING PAGE (SITE PÚBLICO)
 // ============================================================================
 const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -333,7 +333,7 @@ const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
 
 
 // ============================================================================
-// 2. PORTAL DO CLIENTE - CÓDIGO COMPLETO (DESATIVADO NA NAVEGAÇÃO PELA APP)
+// 2. PORTAL DO CLIENTE
 // ============================================================================
 const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials, tenantConfig }) => {
   const [chatOpen, setChatOpen] = useState(false);
@@ -541,7 +541,7 @@ const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMe
 };
 
 // ============================================================================
-// 3. PAINEL DO ADVOGADO (COM UPLOAD REAL E AUTOMAÇÃO)
+// 3. PAINEL DO ADVOGADO
 // ============================================================================
 const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout, onUpdateLead, tenantConfig }) => {
   const [activeTab, setActiveTab] = useState('kanban');
@@ -566,17 +566,13 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
     sentenca: cases.filter(c => c.stage === 'sentenca')
   }), [cases]);
 
-  // Estados dos Modais
   const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
   const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
-  
-  // Estados de Loading
   const [isSavingCase, setIsSavingCase] = useState(false);
   const [isSavingFin, setIsSavingFin] = useState(false);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
-  // Estados de Formulário
   const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '', processNumber: '', notes: '' });
   const [newFinData, setNewFinData] = useState({ client: '', amount: '', dueDate: '', type: 'Boleto' });
   const [finChargeType, setFinChargeType] = useState('Honorários Iniciais');
@@ -584,7 +580,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
   const [finCurrentInstallment, setFinCurrentInstallment] = useState(1);
   const [finCustomTitle, setFinCustomTitle] = useState('');
   
-  // 🚀 NOVO: Estado para Upload Real de Ficheiro
   const [selectedFile, setSelectedFile] = useState(null);
   const [docClient, setDocClient] = useState('');
 
@@ -599,8 +594,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
 
   const handleMove = useCallback((id, clientPhone) => {
     onMoveCase(id);
-    // 🤖 PREPARAÇÃO DA AUTOMAÇÃO WHATSAPP
-    // Mostramos ao utilizador que o sistema assumiu o controlo da comunicação
     setNotification({ 
       title: "Processo Atualizado", 
       message: "O caso foi movido. Disparando automação de WhatsApp em background...", 
@@ -621,6 +614,15 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
     window.open(`https://wa.me/55${phoneDigits}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const handleAttendLead = (lead) => {
+    if (lead.status === 'Novo') onUpdateLead(lead.id, 'Contactado');
+    const phoneDigits = lead.phone.replace(/\D/g, '');
+    const message = `Olá, ${lead.name}! Recebemos o seu contacto através do nosso portal jurídico. Como o ${tenantConfig.advogado} pode ajudá-lo hoje?`;
+    window.open(`https://wa.me/55${phoneDigits}?text=${encodeURIComponent(message)}`, '_blank');
+    setNotification({ title: "Atendimento Iniciado", message: `A abrir WhatsApp para ${lead.name}...`, type: "success" });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
   const handleAnxietyClick = (clientName) => {
     setNotification({ 
       title: "Alerta de Ansiedade - " + clientName, 
@@ -630,7 +632,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
     setTimeout(() => setNotification(null), 7000);
   };
 
-  // ☁️ GESTOR DE UPLOAD REAL (FormData)
   const handleAddNewDoc = async (e) => {
     e.preventDefault();
     if (!docClient || !selectedFile) {
@@ -640,16 +641,12 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
     }
 
     setIsUploadingDoc(true);
-    
-    // Prepara o pacote de dados real (multipart/form-data)
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('client', docClient);
     formData.append('name', selectedFile.name);
 
-    // O Frontend envia o FormData inteiro (o backend fará o upload para S3/Supabase)
     const result = await onAddDocument(formData);
-    
     setIsUploadingDoc(false);
     
     if (result && result.success === false) {
@@ -663,7 +660,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Gestores de Submissão restantes
   const handleAddNewCase = async (e) => {
     e.preventDefault();
     setIsSavingCase(true); 
@@ -701,7 +697,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
       
-      {/* Sistema de Notificações */}
       {notification && (
         <div className={`fixed top-6 right-6 z-[300] px-6 py-4 rounded-xl shadow-2xl flex items-start gap-4 animate-slide-in border 
             ${notification.type === 'warning' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-slate-900 border-white/10 text-white'}`}>
@@ -716,7 +711,7 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
         </div>
       )}
 
-      {/* Modal Novo Processo */}
+      {/* Modais de Registo (Processos, Faturas e Documentos) */}
       <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Registar Novo Processo">
          <form onSubmit={handleAddNewCase} className="space-y-4">
           <div>
@@ -743,7 +738,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
         </form>
       </Modal>
 
-      {/* Modal Nova Fatura */}
       <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura">
         <form onSubmit={handleAddNewFin} className="space-y-4">
           <div>
@@ -755,37 +749,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
               ))}
             </select>
           </div>
-          
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Cobrança</label>
-            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={finChargeType} onChange={e => setFinChargeType(e.target.value)}>
-              <option value="Honorários Iniciais">Honorários Iniciais</option>
-              <option value="Honorários Finais">Honorários Finais</option>
-              <option value="Parcelamento">Parcelamento mensal</option>
-              <option value="Outro">Outra descrição (Livre)</option>
-            </select>
-          </div>
-
-          {finChargeType === 'Parcelamento' && (
-            <div className="flex gap-4 animate-fade-in">
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parcela Atual</label>
-                <input required type="number" min="1" max={finTotalInstallments} className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={finCurrentInstallment} onChange={e => setFinCurrentInstallment(e.target.value)} />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">De (Total)</label>
-                <input required type="number" min="2" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={finTotalInstallments} onChange={e => setFinTotalInstallments(e.target.value)} />
-              </div>
-            </div>
-          )}
-
-          {finChargeType === 'Outro' && (
-            <div className="animate-fade-in">
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição Livre</label>
-              <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} placeholder="Ex: Custas Judiciais / Emissão Documentos" value={finCustomTitle} onChange={e => setFinCustomTitle(e.target.value)} />
-            </div>
-          )}
-
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (€)</label>
@@ -796,21 +759,12 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
               <input required type="date" className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={newFinData.dueDate} onChange={e => setNewFinData({...newFinData, dueDate: e.target.value})} />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forma de Pagamento</label>
-            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{ '--tw-ring-color': tenantConfig.primaryColor }} value={newFinData.type} onChange={e => setNewFinData({...newFinData, type: e.target.value})}>
-              <option value="Boleto">Boleto</option>
-              <option value="Pix">Pix</option>
-              <option value="Cartão">Cartão</option>
-            </select>
-          </div>
           <button type="submit" disabled={isSavingFin} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center hover:opacity-90 ${isSavingFin ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ backgroundColor: tenantConfig.primaryColor }}>
             {isSavingFin ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Lançar Cobrança"}
           </button>
         </form>
       </Modal>
 
-      {/* ☁️ Modal Novo Documento (Com Motor de Upload Real) */}
       <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload Seguro de Ficheiro">
         <form onSubmit={handleAddNewDoc} className="space-y-4">
           <div>
@@ -822,14 +776,12 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
               ))}
             </select>
           </div>
-          
           <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition relative">
              <UploadCloud className="w-8 h-8 mb-2 opacity-50" style={{ color: tenantConfig.primaryColor }} />
              <p className="text-xs font-bold text-slate-600 mb-1">
                {selectedFile ? selectedFile.name : "Clique para anexar um ficheiro"}
              </p>
              <p className="text-[10px] text-slate-400">PDF, JPG, PNG (Max 10MB)</p>
-             {/* Input Invisível que captura o ficheiro real */}
              <input 
                type="file" 
                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
@@ -837,19 +789,13 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
                accept=".pdf,.jpg,.jpeg,.png"
              />
           </div>
-
           <button type="submit" disabled={isUploadingDoc || !selectedFile} className={`w-full py-3 mt-4 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center hover:opacity-90 ${(isUploadingDoc || !selectedFile) ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ backgroundColor: tenantConfig.primaryColor }}>
             {isUploadingDoc ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Iniciar Upload Seguro"}
           </button>
         </form>
       </Modal>
 
-      {/* Menu Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[60] md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />
-      )}
-
-      {/* SIDEBAR DO ADVOGADO COM COR DINÂMICA */}
+      {/* Sidebar do Advogado */}
       <aside className={`fixed md:relative z-[70] h-full w-64 text-white flex flex-col shadow-2xl transition-all duration-500 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`} style={{ backgroundColor: tenantConfig.primaryColor }}>
         <div className="p-6 md:p-8 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -972,7 +918,12 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
                          <td className="p-4 md:p-8 text-slate-600 font-medium">{doc.client}</td>
                          <td className="p-4 md:p-8 text-slate-500 font-medium">{doc.date}</td>
                          <td className="p-4 md:p-8 text-slate-400 text-[10px] font-extrabold uppercase tracking-tighter">{doc.size}</td>
-                         <td className="p-4 md:p-8 text-right"><button className="font-extrabold hover:bg-slate-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent flex items-center gap-2 ml-auto shadow-sm" style={{ color: tenantConfig.primaryColor }}><Download className="w-4 h-4" /> <span className="hidden sm:inline">Descarregar</span></button></td>
+                         <td className="p-4 md:p-8 text-right">
+                           {/* 🚀 BOTÃO DE DOWNLOAD ATUALIZADO */}
+                           <button onClick={() => doc.url ? window.open(doc.url, '_blank') : alert('Documento a ser processado na nuvem ou link indisponível.')} className="font-extrabold px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent flex items-center gap-2 ml-auto shadow-sm hover:bg-slate-50" style={{ color: tenantConfig.primaryColor }}>
+                             <Download className="w-4 h-4" /> <span className="hidden sm:inline">Descarregar</span>
+                           </button>
+                         </td>
                        </tr>
                      ))}
                    </tbody>
@@ -1051,7 +1002,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
                          {c.processNumber && (
                             <p className="text-[9px] font-mono mb-4 truncate px-2 py-0.5 rounded inline-block bg-slate-100" style={{ color: tenantConfig.primaryColor }}>{c.processNumber}</p>
                          )}
-                         {/* MOSTRADOR DE NOTAS */}
                          {c.notes && (
                             <p className="text-[9px] text-slate-400 italic mb-4 line-clamp-2 leading-relaxed">"{c.notes}"</p>
                          )}
@@ -1216,7 +1166,6 @@ export default function App() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ stage: newStage, status: newStatus })
       });
-      // 🤖 Aqui, no futuro, o Backend irá intercetar este PATCH e enviar o webhook para a EvolutionAPI/Z-API
     } catch (e) {}
   };
 
@@ -1264,13 +1213,10 @@ export default function App() {
     const fileName = formData.get('name') || "Novo_Documento.pdf";
     const clientName = formData.get('client') || "Desconhecido";
     
-    // UI Otimista
     setDocuments(prev => [{ id: tempId, name: fileName, client: clientName, date: "A processar...", size: "..." }, ...prev]);
     
     const token = localStorage.getItem('pascale_token');
     try {
-      // Repare que NÃO passamos 'Content-Type: application/json' quando usamos FormData.
-      // O browser encarrega-se de criar o boundary multipart automaticamente.
       const response = await fetch(`${API_URL}/documents`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -1282,7 +1228,7 @@ export default function App() {
         return { success: true };
       } else {
         const err = await response.json();
-        setDocuments(prev => prev.filter(d => d.id !== tempId)); // Reverte em caso de erro
+        setDocuments(prev => prev.filter(d => d.id !== tempId)); 
         return { success: false, error: err.error || "Falha no servidor" };
       }
     } catch (e) { 
@@ -1306,7 +1252,6 @@ export default function App() {
       return <LawyerDashboard cases={cases} onMoveCase={(id) => moveCaseInCloud(id, cases.find(c=>c.id===id)?.stage)} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onUpdateFinancial={updateFinancial} onAddFinancial={handleAddFinancial} onAddDocument={handleUploadDocument} globalNotifications={globalNotifications} onLogout={handleLogout} onUpdateLead={updateLeadStatus} tenantConfig={tenantConfig} />;
     }
 
-    // Mesmo com LandingPage e Portal no código, mantemos a porta de entrada trancada no Login/Dashboard
     return <LoginPage onLogin={(newConfig) => { 
         if(newConfig) setTenantConfig(newConfig); 
         setIsAuthenticated(true); 

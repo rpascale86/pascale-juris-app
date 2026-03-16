@@ -130,6 +130,7 @@ model Document {
   client    String
   size      String   @default("1.5 MB")
   date      String   @default("Hoje")
+  url       String?  // 🚀 NOVO CAMPO: Guarda o link seguro do PDF no Supabase
   
   // Tranca o Documento ao Advogado
   lawyer    Lawyer   @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
