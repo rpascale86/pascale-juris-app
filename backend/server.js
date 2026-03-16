@@ -155,7 +155,7 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/leads', async (req, res) => {
   const { name, phone, type } = req.body;
   try {
-    const lawyer = await prisma.lawyer.findFirst(); // Atribui ao primeiro por defeito se não logado
+    const lawyer = await prisma.lawyer.findFirst(); 
     if (!lawyer) return res.status(400).json({ error: 'Nenhum administrador disponível.' });
 
     const newLead = await prisma.lead.create({
@@ -313,6 +313,34 @@ app.get('/api/financials', authenticateToken, async (req, res) => {
     res.json(financials);
   } catch (error) {
     res.status(500).json({ error: 'Erro no financeiro.' });
+  }
+});
+
+app.post('/api/financials', authenticateToken, async (req, res) => {
+  const { title, client, amount, dueDate, type } = req.body;
+  const lawyerId = req.user.lawyerId;
+
+  if (!title || !client || amount === undefined) {
+    return res.status(400).json({ error: 'Dados financeiros incompletos.' });
+  }
+
+  try {
+    const dbClient = await prisma.client.findFirst({ where: { name: client, lawyerId: lawyerId } });
+    if (!dbClient) return res.status(404).json({ error: 'Cliente não encontrado.' });
+
+    const newFinancial = await prisma.financial.create({
+      data: { 
+        title, 
+        amount: parseFloat(amount), 
+        dueDate, 
+        type, 
+        status: "Aberto", 
+        clientId: dbClient.id 
+      }
+    });
+    res.status(201).json(newFinancial);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao guardar a fatura.' });
   }
 });
 
