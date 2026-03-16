@@ -67,8 +67,12 @@ const sendWhatsAppNotification = async (phone, message) => {
     console.log(`\n[🤖 WhatsApp Bot] Disparando para: +55 ${cleanPhone}`);
     console.log(`[🤖 WhatsApp Bot] Mensagem: "${message}"`);
     
-    // 🚧 Integração futura:
-    // await fetch('https://api-whatsapp/send', { ... });
+    // 🚧 Integração futura (Exemplo: Evolution API):
+    // await fetch('https://sua-api-wa/message/sendText', {
+    //   method: 'POST',
+    //   headers: { 'apikey': process.env.WA_KEY, 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ number: `55${cleanPhone}`, text: message })
+    // });
 
     console.log(`[🤖 WhatsApp Bot] ✅ Mensagem enviada com sucesso em background.\n`);
   } catch (error) {
