@@ -97,7 +97,7 @@ const Modal = React.memo(({ isOpen, onClose, title, children }) => {
 });
 
 // 0. LOGIN E REGISTO REAL
-const LoginPage = ({ onLogin, tenantConfig }) => {
+const LoginPage = ({ onLogin, onNavigate, tenantConfig }) => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -144,6 +144,9 @@ const LoginPage = ({ onLogin, tenantConfig }) => {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
         <div className="p-8 text-center" style={{ backgroundColor: isRegisterMode ? '#1e293b' : tenantConfig.primaryColor }}>
+          <button onClick={() => onNavigate('landing')} className="absolute top-4 left-4 text-white/50 hover:text-white transition">
+            <ArrowRight className="w-5 h-5 rotate-180" />
+          </button>
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 text-white">
             {isRegisterMode ? <ShieldCheck className="w-8 h-8" /> : <Gavel className="w-8 h-8" />}
           </div>
@@ -216,12 +219,12 @@ const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
       )}
 
       <header className="px-6 py-4 flex justify-between items-center border-b shadow-sm sticky top-0 bg-white z-50">
-        <div className="flex items-center gap-2 font-bold text-xl cursor-pointer" style={{ color: tenantConfig.primaryColor }} onClick={() => onNavigate('login')}>
+        <div className="flex items-center gap-2 font-bold text-xl cursor-pointer" style={{ color: tenantConfig.primaryColor }}>
           <Gavel className="w-6 h-6" />
           {tenantConfig.logoText}
         </div>
         <button onClick={() => onNavigate('login')} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 transition">
-          Área do Cliente
+          Área do Escritório
         </button>
       </header>
 
@@ -256,7 +259,7 @@ const LandingPage = ({ onNavigate, onAddLead, tenantConfig }) => {
             <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto md:mx-0">Acompanhe cada etapa do seu caso em tempo real através do nosso portal exclusivo. Simples, rápido e na palma da sua mão.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
               <button onClick={() => setIsModalOpen(true)} className="px-8 py-4 text-white rounded-xl font-bold text-lg shadow-lg hover:opacity-90 transition transform hover:-translate-y-1" style={{ backgroundColor: tenantConfig.primaryColor }}>Iniciar Consulta Agora</button>
-              <button onClick={() => onNavigate('login')} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:border-slate-300 transition">Portal do Cliente</button>
+              <button onClick={() => onNavigate('login')} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:border-slate-300 transition">Sou Advogado / Cliente</button>
             </div>
           </div>
         </section>
@@ -394,6 +397,7 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
             <Gavel className="w-6 h-6" />
             <span className="font-extrabold text-lg tracking-tighter">{tenantConfig.logoText}</span>
           </div>
+          <button className="md:hidden" onClick={() => setIsMobileMenuOpen(false)}><X className="w-6 h-6" /></button>
         </div>
         <nav className="flex-1 p-6 space-y-2">
           <button onClick={() => setActiveTab('kanban')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm ${activeTab === 'kanban' ? 'bg-white/20' : 'hover:bg-white/5'}`}><Activity className="w-4 h-4" /> Gestão</button>
@@ -408,7 +412,10 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-20 bg-white border-b flex items-center justify-between px-8 shadow-sm">
-          <h1 className="font-extrabold text-xl text-slate-800 capitalize">{activeTab}</h1>
+          <div className="flex items-center gap-4">
+             <button className="md:hidden" onClick={() => setIsMobileMenuOpen(true)}><Menu className="w-6 h-6" /></button>
+             <h1 className="font-extrabold text-xl text-slate-800 capitalize">{activeTab}</h1>
+          </div>
           <div className="flex items-center gap-4">
             <button onClick={() => {
               if (activeTab === 'kanban') setIsAddCaseModalOpen(true);
@@ -541,7 +548,7 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
 
 // --- APP CONTROLLER ---
 export default function App() {
-  const [currentView, setCurrentView] = useState('login'); 
+  const [currentView, setCurrentView] = useState('landing'); 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   
@@ -560,13 +567,16 @@ export default function App() {
   const handleLogout = useCallback(() => {
     localStorage.removeItem('pascale_token');
     setIsAuthenticated(false);
-    setCurrentView('login');
+    setCurrentView('landing');
   }, []);
 
   const fetchCloudData = useCallback(async () => {
     setLoadingData(true);
     const token = localStorage.getItem('pascale_token');
-    if (!token) return handleLogout();
+    if (!token) {
+        setLoadingData(false);
+        return;
+    }
 
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
@@ -599,8 +609,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) fetchCloudData();
-  }, [isAuthenticated, fetchCloudData]);
+    if (isAuthenticated && currentView === 'dashboard') fetchCloudData();
+  }, [isAuthenticated, currentView, fetchCloudData]);
 
   // Ações de Nuvem
   const addCaseToCloud = async (data) => {
@@ -659,11 +669,14 @@ export default function App() {
   const renderView = () => {
     if (loadingData) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white font-bold animate-pulse">Sincronizando com a Nuvem...</div>;
     
-    if (currentView === 'dashboard' && isAuthenticated) {
-      return <LawyerDashboard cases={cases} onMoveCase={moveCaseInCloud} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onAddFinancial={addFinancialToCloud} onAddDocument={uploadDocToCloud} onLogout={handleLogout} tenantConfig={tenantConfig} />;
+    switch(currentView) {
+        case 'landing': return <LandingPage onNavigate={setCurrentView} onAddLead={addLeadToCloud} tenantConfig={tenantConfig} />;
+        case 'login': return <LoginPage onLogin={(cfg) => { setTenantConfig(cfg); setIsAuthenticated(true); setCurrentView('dashboard'); }} onNavigate={setCurrentView} tenantConfig={tenantConfig} />;
+        case 'dashboard': 
+            if (isAuthenticated) return <LawyerDashboard cases={cases} onMoveCase={moveCaseInCloud} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onAddFinancial={addFinancialToCloud} onAddDocument={uploadDocToCloud} onLogout={handleLogout} tenantConfig={tenantConfig} />;
+            return <LoginPage onLogin={(cfg) => { setTenantConfig(cfg); setIsAuthenticated(true); setCurrentView('dashboard'); }} onNavigate={setCurrentView} tenantConfig={tenantConfig} />;
+        default: return <LandingPage onNavigate={setCurrentView} onAddLead={addLeadToCloud} tenantConfig={tenantConfig} />;
     }
-
-    return <LoginPage onLogin={(cfg) => { setTenantConfig(cfg); setIsAuthenticated(true); setCurrentView('dashboard'); }} tenantConfig={tenantConfig} />;
   };
 
   return (
