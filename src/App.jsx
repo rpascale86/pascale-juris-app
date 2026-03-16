@@ -302,6 +302,17 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
     setTimeout(() => setNotification(null), 4000);
   };
 
+  const handleAddNewFin = async (e) => {
+    e.preventDefault();
+    const res = await onAddFinancial(newFinData);
+    if (res.success) {
+      setIsAddFinModalOpen(false);
+      setNewFinData({ client: '', amount: '', dueDate: '', type: 'Boleto', title: 'Honorários' });
+      setNotification({ title: "Financeiro", message: "Nova fatura lançada com sucesso.", type: "success" });
+    }
+    setTimeout(() => setNotification(null), 4000);
+  };
+
   const handleAddNewDoc = async (e) => {
     e.preventDefault();
     if (!docClient || !selectedFile) return;
@@ -346,6 +357,21 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
         </form>
       </Modal>
 
+      <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Cobrança">
+        <form onSubmit={handleAddNewFin} className="space-y-4">
+          <select required className="w-full p-3 border rounded-lg bg-slate-50" value={newFinData.client} onChange={e => setNewFinData({...newFinData, client: e.target.value})}>
+             <option value="">Para qual cliente?</option>
+             {activeClients.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{'--tw-ring-color': tenantConfig.primaryColor}} placeholder="Descrição (ex: Honorários)" value={newFinData.title} onChange={e => setNewFinData({...newFinData, title: e.target.value})} />
+          <div className="flex gap-4">
+            <input required type="number" step="0.01" className="flex-1 p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{'--tw-ring-color': tenantConfig.primaryColor}} placeholder="Valor (€)" value={newFinData.amount} onChange={e => setNewFinData({...newFinData, amount: e.target.value})} />
+            <input required type="date" className="flex-1 p-3 border rounded-lg outline-none focus:ring-2 bg-slate-50" style={{'--tw-ring-color': tenantConfig.primaryColor}} value={newFinData.dueDate} onChange={e => setNewFinData({...newFinData, dueDate: e.target.value})} />
+          </div>
+          <button type="submit" className="w-full py-3 text-white rounded-lg font-bold shadow-lg bg-green-600">Lançar Fatura</button>
+        </form>
+      </Modal>
+
       <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload de Ficheiro">
         <form onSubmit={handleAddNewDoc} className="space-y-4">
           <select required className="w-full p-3 border rounded-lg bg-slate-50" value={docClient} onChange={e => setDocClient(e.target.value)}>
@@ -387,6 +413,7 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
             <button onClick={() => {
               if (activeTab === 'kanban') setIsAddCaseModalOpen(true);
               if (activeTab === 'docs') setIsAddDocModalOpen(true);
+              if (activeTab === 'finance') setIsAddFinModalOpen(true);
             }} className="p-2.5 rounded-xl text-white shadow-lg flex items-center gap-2 text-sm font-bold" style={{ backgroundColor: tenantConfig.primaryColor }}>
               <Plus className="w-4 h-4" /> Novo
             </button>
@@ -426,8 +453,65 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
             </div>
           )}
 
+          {activeTab === 'leads' && (
+            <div className="bg-white rounded-3xl shadow-xl overflow-hidden animate-fade-in">
+               <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-[10px] font-extrabold uppercase text-slate-400 tracking-widest border-b">
+                    <tr><th className="p-6">Nome do Lead</th><th className="p-6">Contacto</th><th className="p-6">Interesse</th><th className="p-6 text-right">Acção</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {leads.map(lead => (
+                      <tr key={lead.id} className="hover:bg-slate-50 transition">
+                        <td className="p-6 font-bold text-slate-800">{lead.name}</td>
+                        <td className="p-6 text-slate-500 text-sm">{lead.phone}</td>
+                        <td className="p-6"><span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{lead.type}</span></td>
+                        <td className="p-6 text-right">
+                          <button onClick={() => window.open(`https://wa.me/55${lead.phone.replace(/\D/g,'')}`, '_blank')} className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 transition"><MessageSquare className="w-4 h-4" /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+               </table>
+            </div>
+          )}
+
+          {activeTab === 'finance' && (
+            <div className="space-y-6 animate-fade-in">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                     <div className="text-xs font-bold text-slate-400 uppercase mb-2">Total Recebido</div>
+                     <div className="text-2xl font-extrabold text-slate-800">{formatCurrency(financials.filter(f => f.status === 'Pago').reduce((acc, curr) => acc + curr.amount, 0))}</div>
+                  </div>
+                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                     <div className="text-xs font-bold text-slate-400 uppercase mb-2">Pendente</div>
+                     <div className="text-2xl font-extrabold text-orange-600">{formatCurrency(financials.filter(f => f.status === 'Aberto').reduce((acc, curr) => acc + curr.amount, 0))}</div>
+                  </div>
+               </div>
+               <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+                  <table className="w-full text-left">
+                     <thead className="bg-slate-50 text-[10px] font-extrabold uppercase text-slate-400 tracking-widest border-b">
+                        <tr><th className="p-6">Fatura</th><th className="p-6">Cliente</th><th className="p-6">Valor</th><th className="p-6">Vencimento</th><th className="p-6">Status</th></tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                        {financials.map(fin => (
+                           <tr key={fin.id} className="hover:bg-slate-50 transition">
+                              <td className="p-6 font-bold text-slate-800">{fin.title}</td>
+                              <td className="p-6 text-slate-500 text-sm">{fin.client}</td>
+                              <td className="p-6 font-bold">{formatCurrency(fin.amount)}</td>
+                              <td className="p-6 text-slate-400 text-sm">{formatDate(fin.dueDate)}</td>
+                              <td className="p-6">
+                                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{fin.status}</span>
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+          )}
+
           {activeTab === 'docs' && (
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-xl overflow-hidden animate-fade-in">
                <table className="w-full text-left">
                   <thead className="bg-slate-50 text-[10px] font-extrabold uppercase text-slate-400 tracking-widest border-b">
                     <tr><th className="p-6">Ficheiro</th><th className="p-6">Cliente</th><th className="p-6">Data</th><th className="p-6 text-right">Acção</th></tr>
@@ -449,8 +533,6 @@ const LawyerDashboard = ({ cases, onMoveCase, onAddCase, leads, documents, finan
                </table>
             </div>
           )}
-          
-          {/* Adicione visões para Leads e Finanças conforme necessário */}
         </div>
       </main>
     </div>
@@ -532,6 +614,17 @@ export default function App() {
     return { success: false, error: "Erro ao salvar" };
   };
 
+  const addFinancialToCloud = async (data) => {
+    const token = localStorage.getItem('pascale_token');
+    const res = await fetch(`${API_URL}/financials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) { fetchCloudData(); return { success: true }; }
+    return { success: false };
+  };
+
   const moveCaseInCloud = async (id, currentStage) => {
     const next = currentStage === 'peticao' ? 'analise_juiz' : 'sentenca';
     const token = localStorage.getItem('pascale_token');
@@ -554,11 +647,20 @@ export default function App() {
     return { success: false };
   };
 
+  const addLeadToCloud = async (leadData) => {
+    const res = await fetch(`${API_URL}/leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(leadData)
+    });
+    if (res.ok && isAuthenticated) fetchCloudData();
+  };
+
   const renderView = () => {
     if (loadingData) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white font-bold animate-pulse">Sincronizando com a Nuvem...</div>;
     
     if (currentView === 'dashboard' && isAuthenticated) {
-      return <LawyerDashboard cases={cases} onMoveCase={moveCaseInCloud} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onAddDocument={uploadDocToCloud} onLogout={handleLogout} tenantConfig={tenantConfig} />;
+      return <LawyerDashboard cases={cases} onMoveCase={moveCaseInCloud} onAddCase={addCaseToCloud} leads={leads} documents={documents} financials={financials} onAddFinancial={addFinancialToCloud} onAddDocument={uploadDocToCloud} onLogout={handleLogout} tenantConfig={tenantConfig} />;
     }
 
     return <LoginPage onLogin={(cfg) => { setTenantConfig(cfg); setIsAuthenticated(true); setCurrentView('dashboard'); }} tenantConfig={tenantConfig} />;
