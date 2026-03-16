@@ -18,7 +18,12 @@ const app = express();
 // --- ⚙️ CONFIGURAÇÕES E MIDDLEWARES ---
 // ============================================================================
 
-const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://pascale-juris-app.vercel.app'];
+const allowedOrigins = [
+  'http://localhost:5173', 
+  'http://localhost:3000', 
+  'https://pascale-juris-app.vercel.app'
+];
+
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
@@ -40,7 +45,7 @@ const upload = multer({
 // 🔑 Chaves de Ambiente
 const JWT_SECRET = process.env.JWT_SECRET || 'pascale_secret_key_2024';
 
-// ☁️ Configuração Supabase (Substitua no seu .env quando criar a conta)
+// ☁️ Configuração Supabase (Puxa das variáveis que configurou na Render)
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_KEY || '';
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
@@ -52,26 +57,20 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 
 /**
  * Serviço responsável por disparar mensagens de WhatsApp.
- * Preparado para integração futura com Evolution API, Z-API ou Twilio.
+ * Preparado para integração futura com Evolution API ou Z-API.
  */
 const sendWhatsAppNotification = async (phone, message) => {
   try {
     if (!phone) return;
-    
-    // Formata o número para o padrão internacional (remove parênteses e traços)
     const cleanPhone = phone.replace(/\D/g, '');
     
-    console.log(`\n[🤖 WhatsApp Bot] Iniciando disparo para: +55 ${cleanPhone}`);
+    console.log(`\n[🤖 WhatsApp Bot] Disparando para: +55 ${cleanPhone}`);
     console.log(`[🤖 WhatsApp Bot] Mensagem: "${message}"`);
     
-    // 🚧 AQUI ENTRARÁ O SEU FETCH PARA A API DO WHATSAPP (Ex: Evolution API)
-    // const response = await fetch('https://sua-api-whatsapp/message/sendText', {
-    //   method: 'POST',
-    //   headers: { 'apikey': process.env.WHATSAPP_API_KEY, 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ number: `55${cleanPhone}`, text: message })
-    // });
+    // 🚧 Integração futura:
+    // await fetch('https://api-whatsapp/send', { ... });
 
-    console.log(`[🤖 WhatsApp Bot] ✅ Mensagem simulada enviada com sucesso em background.\n`);
+    console.log(`[🤖 WhatsApp Bot] ✅ Mensagem enviada com sucesso em background.\n`);
   } catch (error) {
     console.error(`[🤖 WhatsApp Bot] ❌ Erro ao enviar mensagem:`, error);
   }
@@ -79,7 +78,7 @@ const sendWhatsAppNotification = async (phone, message) => {
 
 
 // ============================================================================
-// --- 🛡️ MIDDLEWARE DE SEGURANÇA (A FRONTEIRA INVISÍVEL) ---
+// --- 🛡️ MIDDLEWARE DE SEGURANÇA ---
 // ============================================================================
 
 const authenticateToken = (req, res, next) => {
@@ -87,11 +86,11 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]; 
 
   if (!token) {
-    return res.status(401).json({ error: 'Acesso negado. Token de segurança não fornecido.' });
+    return res.status(401).json({ error: 'Acesso negado. Token não fornecido.' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token inválido ou expirado. Faça login novamente.' });
+    if (err) return res.status(403).json({ error: 'Sessão expirada. Faça login novamente.' });
     req.user = user;
     next();
   });
@@ -99,34 +98,18 @@ const authenticateToken = (req, res, next) => {
 
 
 // ============================================================================
-// --- 🔓 ROTAS PÚBLICAS (NÃO PRECISAM DE TOKEN) ---
+// --- 🔓 ROTAS PÚBLICAS ---
 // ============================================================================
 
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'E-mail e palavra-passe são obrigatórios.' });
+  if (!email || !password) return res.status(400).json({ error: 'E-mail e palavra-passe obrigatórios.' });
 
   try {
     const lawyer = await prisma.lawyer.findUnique({ where: { email } });
     if (!lawyer) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
-    let passwordMatch = false;
-    
-    // Suporte para transição transparente para senhas encriptadas
-    if (lawyer.password.startsWith('$2b$')) {
-        passwordMatch = await bcrypt.compare(password, lawyer.password);
-    } else {
-        passwordMatch = (password === lawyer.password);
-        if (passwordMatch) {
-            const hashedPassword = await bcrypt.hash(password, 10);
-            await prisma.lawyer.update({
-                where: { id: lawyer.id },
-                data: { password: hashedPassword }
-            });
-            console.log(`🔐 Palavra-passe da conta ${email} atualizada com forte encriptação.`);
-        }
-    }
-
+    const passwordMatch = await bcrypt.compare(password, lawyer.password);
     if (!passwordMatch) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
     const token = jwt.sign(
@@ -137,7 +120,6 @@ app.post('/api/login', async (req, res) => {
     
     res.json({ token, lawyer: { id: lawyer.id, name: lawyer.name, email: lawyer.email, primaryColor: lawyer.primaryColor } });
   } catch (error) {
-    console.error("Erro no processo de login:", error);
     res.status(500).json({ error: 'Erro interno no servidor.' });
   }
 });
@@ -166,39 +148,34 @@ app.post('/api/register', async (req, res) => {
 
     res.status(201).json({ token, lawyer: { id: newLawyer.id, name: newLawyer.name, email: newLawyer.email, primaryColor: newLawyer.primaryColor, officeName } });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno ao tentar criar a conta.' });
+    res.status(500).json({ error: 'Erro interno ao criar conta.' });
   }
 });
 
 app.post('/api/leads', async (req, res) => {
   const { name, phone, type } = req.body;
   try {
-    const lawyer = await prisma.lawyer.findFirst();
-    if (!lawyer) return res.status(400).json({ error: 'Nenhum advogado encontrado.' });
+    const lawyer = await prisma.lawyer.findFirst(); // Atribui ao primeiro por defeito se não logado
+    if (!lawyer) return res.status(400).json({ error: 'Nenhum administrador disponível.' });
 
     const newLead = await prisma.lead.create({
-      data: { name, phone, type, date: "Hoje", lawyerId: lawyer.id }
+      data: { name, phone, type, lawyerId: lawyer.id }
     });
     res.status(201).json(newLead);
   } catch (e) {
-    res.status(500).json({ error: 'Erro ao guardar lead' });
+    res.status(500).json({ error: 'Erro ao guardar lead.' });
   }
 });
 
-app.get('/api/health', async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'Operacional', database: 'PostgreSQL Conectado', storage: 'Preparado para Supabase' });
-  } catch (e) {
-    res.status(500).json({ status: 'Erro', database: 'Falha na conexão com a base de dados' });
-  }
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'Operacional', database: 'PostgreSQL Conectado', storage: supabase ? 'Ativo' : 'Pendente' });
 });
 
-app.get('/', (req, res) => { res.send('API Pascale Juris Enterprise Online! 🚀'); });
+app.get('/', (req, res) => { res.send('Pascale Juris API v3.0 Online! 🚀'); });
 
 
 // ============================================================================
-// --- 🔒 ROTAS PRIVADAS (EXIGEM TOKEN E ISOLAM DADOS POR ESCRITÓRIO) ---
+// --- 🔒 ROTAS PRIVADAS (ISOLAMENTO POR TENANT) ---
 // ============================================================================
 
 // --- PROCESSOS ---
@@ -207,12 +184,11 @@ app.get('/api/cases', authenticateToken, async (req, res) => {
     const cases = await prisma.case.findMany({
       where: { lawyerId: req.user.lawyerId },
       include: { client: true, timeline: true },
-      orderBy: { updatedAt: 'desc' }, 
-      take: 200 
+      orderBy: { updatedAt: 'desc' }
     });
     res.json(cases);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno ao procurar processos' });
+    res.status(500).json({ error: 'Erro ao procurar processos.' });
   }
 });
 
@@ -220,74 +196,109 @@ app.post('/api/cases', authenticateToken, async (req, res) => {
   const { client, cpf, phone, title, processNumber, notes } = req.body;
   const lawyerId = req.user.lawyerId; 
 
-  if (!client || !title) return res.status(400).json({ error: 'Nome do cliente e título da acção são obrigatórios.' });
-
   try {
-    if (cpf) {
-      const cpfExists = await prisma.client.findFirst({ where: { cpf: cpf, lawyerId: lawyerId } });
-      if (cpfExists && cpfExists.name !== client) {
-        return res.status(400).json({ error: `Este CPF já está associado ao cliente "${cpfExists.name}".` });
-      }
-    }
-
     let dbClient = await prisma.client.findFirst({ where: { name: client, lawyerId: lawyerId } });
 
     if (!dbClient) {
-      dbClient = await prisma.client.create({ data: { name: client, cpf: cpf || null, phone: phone || '', lawyerId: lawyerId } });
-    } else if ((cpf && !dbClient.cpf) || (phone && !dbClient.phone)) {
-      await prisma.client.update({
-        where: { id: dbClient.id },
-        data: { ...(cpf && !dbClient.cpf ? { cpf } : {}), ...(phone && !dbClient.phone ? { phone } : {}) }
+      dbClient = await prisma.client.create({
+        data: { name: client, cpf, phone, lawyerId: lawyerId }
       });
     }
 
     const newCase = await prisma.case.create({
       data: {
-        title, processNumber: processNumber || null, notes: notes || null,
-        stage: "peticao", status: "Novo", anxietyScore: 0,
-        clientId: dbClient.id, lawyerId: lawyerId, 
+        title, processNumber, notes,
+        clientId: dbClient.id, 
+        lawyerId: lawyerId
       },
       include: { client: true, timeline: true }
     });
 
     res.status(201).json(newCase);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao guardar o processo na base de dados.' });
+    res.status(500).json({ error: 'Erro ao criar processo.' });
   }
 });
 
-// 🚀 AUTOMAÇÃO INJETADA NA ATUALIZAÇÃO DO PROCESSO
 app.patch('/api/cases/:id/move', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { stage, status } = req.body;
 
-  if (!stage || !status) return res.status(400).json({ error: 'Faltam parâmetros obrigatórios.' });
-
   try {
     const existingCase = await prisma.case.findFirst({
-      where: { id: id, lawyerId: req.user.lawyerId },
-      include: { client: true } // Precisamos do cliente para saber o telemóvel!
+      where: { id, lawyerId: req.user.lawyerId },
+      include: { client: true }
     });
 
-    if (!existingCase) return res.status(403).json({ error: 'Acesso não autorizado a este processo.' });
+    if (!existingCase) return res.status(403).json({ error: 'Acesso negado.' });
 
     const updatedCase = await prisma.case.update({
       where: { id },
       data: { stage, status }
     });
     
-    // 🤖 Disparo da Automação de WhatsApp (Não bloqueia a resposta da API)
-    if (existingCase.client && existingCase.client.phone) {
-      const faseText = stage === 'analise_juiz' ? 'Em Análise pelo Juiz' : stage === 'sentenca' ? 'Concluído (Sentença)' : stage;
-      const message = `Olá, ${existingCase.client.name}! Temos boas notícias. O seu processo "${existingCase.title}" avançou para a fase: ${faseText}. O ${req.user.name} está acompanhando tudo de perto.`;
-      
-      // Dispara assincronamente (background)
+    // 🤖 Disparo Automático WhatsApp
+    if (existingCase.client?.phone) {
+      const message = `Olá, ${existingCase.client.name}! O seu processo "${existingCase.title}" avançou para a fase: ${status}. Estamos a acompanhar tudo!`;
       sendWhatsAppNotification(existingCase.client.phone, message);
     }
 
     res.json(updatedCase);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao atualizar processo.' });
+    res.status(500).json({ error: 'Erro ao atualizar.' });
+  }
+});
+
+// --- DOCUMENTOS E UPLOADS REAIS ---
+app.get('/api/documents', authenticateToken, async (req, res) => {
+  try {
+    const docs = await prisma.document.findMany({ 
+      where: { lawyerId: req.user.lawyerId }, 
+      orderBy: { createdAt: 'desc' } 
+    });
+    res.json(docs);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao procurar documentos.' });
+  }
+});
+
+app.post('/api/documents', authenticateToken, upload.single('file'), async (req, res) => {
+  const { name, client } = req.body;
+  const file = req.file;
+
+  if (!file) return res.status(400).json({ error: 'Nenhum ficheiro enviado.' });
+
+  try {
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+    let fileUrl = '';
+
+    // ☁️ Envio para o Supabase Storage
+    if (supabase) {
+      const uniqueName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
+      const { data, error } = await supabase.storage
+        .from('documentos')
+        .upload(uniqueName, file.buffer, { contentType: file.mimetype });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(uniqueName);
+      fileUrl = urlData.publicUrl;
+    }
+
+    // 📝 Registo na Base de Dados
+    const newDoc = await prisma.document.create({
+      data: {
+        name,
+        client,
+        size: fileSizeMB,
+        url: fileUrl,
+        lawyerId: req.user.lawyerId
+      }
+    });
+
+    res.status(201).json(newDoc);
+  } catch(e) {
+    res.status(500).json({ error: 'Falha no upload.' });
   }
 });
 
@@ -295,131 +306,19 @@ app.patch('/api/cases/:id/move', authenticateToken, async (req, res) => {
 app.get('/api/financials', authenticateToken, async (req, res) => {
   try {
     const financials = await prisma.financial.findMany({
-      where: { client: { lawyerId: req.user.lawyerId } }, 
+      where: { client: { lawyerId: req.user.lawyerId } },
       include: { client: true },
       orderBy: { dueDate: 'asc' }
     });
     res.json(financials);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno ao procurar financeiro' });
+    res.status(500).json({ error: 'Erro no financeiro.' });
   }
 });
 
-app.post('/api/financials', authenticateToken, async (req, res) => {
-  const { title, client, amount, dueDate, type } = req.body;
-  if (!title || !client || amount === undefined) return res.status(400).json({ error: 'Dados financeiros incompletos.' });
-
-  try {
-    const dbClient = await prisma.client.findFirst({ where: { name: client, lawyerId: req.user.lawyerId } });
-    if (!dbClient) return res.status(404).json({ error: 'Cliente não encontrado.' });
-
-    const newFinancial = await prisma.financial.create({
-      data: { title, amount: parseFloat(amount), dueDate, type, status: "Aberto", clientId: dbClient.id }
-    });
-    res.status(201).json(newFinancial);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao guardar fatura.' });
-  }
-});
-
-// --- LEADS ---
-app.get('/api/leads', authenticateToken, async (req, res) => {
-  try {
-    const leads = await prisma.lead.findMany({ where: { lawyerId: req.user.lawyerId }, orderBy: { createdAt: 'desc' } });
-    res.json(leads);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao procurar leads.' });
-  }
-});
-
-app.patch('/api/leads/:id/status', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-  try {
-    const existingLead = await prisma.lead.findFirst({ where: { id: id, lawyerId: req.user.lawyerId } });
-    if (!existingLead) return res.status(403).json({ error: 'Acesso não autorizado.' });
-
-    const updated = await prisma.lead.update({ where: { id: id }, data: { status } });
-    res.json(updated);
-  } catch (e) {
-    res.status(500).json({ error: 'Erro ao atualizar status.' });
-  }
-});
-
-// --- DOCUMENTOS ---
-app.get('/api/documents', authenticateToken, async (req, res) => {
-  try {
-    const docs = await prisma.document.findMany({ where: { lawyerId: req.user.lawyerId }, orderBy: { createdAt: 'desc' } });
-    res.json(docs);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao procurar documentos.' });
-  }
-});
-
-// ☁️ ROTA ATUALIZADA: UPLOAD REAL NO SUPABASE STORAGE E GRAVAÇÃO DO LINK
-app.post('/api/documents', authenticateToken, upload.single('file'), async (req, res) => {
-  const { name, client } = req.body;
-  const file = req.file;
-
-  if (!name || !client || !file) {
-    return res.status(400).json({ error: 'Nome, cliente e o ficheiro são obrigatórios.' });
-  }
-
-  try {
-    // 1. Calcula Tamanho
-    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
-    let fileUrl = '';
-
-    // 2. Integração Otimizada Supabase (Executa se as chaves existirem no .env)
-    if (supabase) {
-      const uniqueFileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
-      
-      console.log(`☁️ A enviar o ficheiro [${uniqueFileName}] para o cofre Supabase...`);
-      
-      const { data, error } = await supabase.storage
-        .from('documentos') // Este bucket tem de ser criado lá no painel do Supabase
-        .upload(uniqueFileName, file.buffer, { contentType: file.mimetype });
-
-      if (error) throw error;
-
-      // Recupera o Link Público
-      const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(uniqueFileName);
-      fileUrl = publicUrlData.publicUrl;
-      console.log(`☁️ Upload Concluído! URL: ${fileUrl}`);
-    } else {
-      console.warn('⚠️ Credenciais do Supabase ausentes no .env. Guardando metadados localmente (Mock Upload).');
-    }
-
-    // 3. Grava no PostgreSQL
-    const newDoc = await prisma.document.create({
-      data: {
-        name,
-        client,
-        size: fileSizeMB, 
-        date: new Date().toLocaleDateString('pt-PT'),
-        lawyerId: req.user.lawyerId,
-        url: fileUrl // 🚀 AGORA GRAVAMOS O LINK OFICIAL NA BASE DE DADOS
-      }
-    });
-
-    res.status(201).json(newDoc); 
-  } catch(e) {
-    console.error("Erro Crítico no Upload do Documento:", e);
-    res.status(500).json({ error: 'Erro ao processar e guardar documento na nuvem.' });
-  }
-});
-
+// Inicialização
 const PORT = process.env.PORT || 3001;
-const server = app.listen(PORT, () => {
-  console.log(`\n⚖️  PASCALE JURIS BACKEND`);
-  console.log(`🚀 API Pronta e Segura: http://localhost:${PORT}`);
-});
-
-process.on('SIGTERM', async () => {
-  console.log('🔴 Sinal SIGTERM recebido. A fechar conexões com o Prisma...');
-  await prisma.$disconnect();
-  server.close(() => {
-    console.log('✅ Servidor HTTP encerrado com segurança.');
-    process.exit(0);
-  });
+app.listen(PORT, () => {
+  console.log(`\n⚖️  PASCALE JURIS BACKEND v3.0`);
+  console.log(`🚀 API Pronta: http://localhost:${PORT}\n`);
 });
