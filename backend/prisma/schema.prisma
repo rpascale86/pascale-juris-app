@@ -12,9 +12,10 @@ model Lawyer {
   name          String
   email         String      @unique
   password      String
+  officeName    String?
   primaryColor  String      @default("#4f46e5")
   
-  // Relações (Tudo o que pertence a este escritório)
+  // Relações SaaS (Isolamento total por Advogado)
   clients       Client[]
   cases         Case[]
   leads         Lead[]
@@ -34,7 +35,7 @@ model Client {
   cases      Case[]
   financials Financial[]
   
-  // Tranca o cliente ao Advogado
+  // Vínculo Tenant
   lawyer     Lawyer      @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
   lawyerId   String
   
@@ -57,7 +58,6 @@ model Case {
   client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId      String
   
-  // Tranca o processo ao Advogado
   lawyer        Lawyer         @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
   lawyerId      String
   
@@ -76,7 +76,6 @@ model CaseTimeline {
   description String?
   date        String
   completed   Boolean  @default(false)
-  isCurrent   Boolean  @default(false)
   
   case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseId      String
@@ -99,9 +98,7 @@ model Financial {
   clientId  String
   
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@index([dueDate(sort: Asc)])
   @@index([clientId])
   @@map("financials")
 }
@@ -114,7 +111,6 @@ model Lead {
   status    String   @default("Novo")
   date      String   @default("Hoje")
   
-  // Tranca o Lead ao Advogado
   lawyer    Lawyer   @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
   lawyerId  String
   
@@ -130,9 +126,8 @@ model Document {
   client    String
   size      String   @default("1.5 MB")
   date      String   @default("Hoje")
-  url       String?  // 🚀 NOVO CAMPO: Guarda o link seguro do PDF no Supabase
+  url       String?  
   
-  // Tranca o Documento ao Advogado
   lawyer    Lawyer   @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
   lawyerId  String
   
