@@ -376,7 +376,32 @@ const LawyerDashboard = ({ data, onMove, onAddCase, onAddFin, onAddDoc, onLogout
                         </div>
                         <h3 className="font-black text-slate-800 text-lg leading-tight">{c.client?.name || c.client}</h3>
                         <p className="text-xs text-slate-500 font-medium mt-1 line-clamp-2">{c.title}</p>
-                        <TJSPLink processNumber={c.processNumber} />
+                        
+                        <div className="mt-1"><TJSPLink processNumber={c.processNumber} /></div>
+
+                        {/* --- PAINEL DAS ÚLTIMAS 3 MOVIMENTAÇÕES --- */}
+                        {c.timeline && c.timeline.length > 0 && (
+                          <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <div className="flex items-center gap-1.5 mb-3">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Últimas 3 Movimentações</span>
+                            </div>
+                            <div className="space-y-3">
+                              {[...c.timeline].reverse().slice(0, 3).map((step, idx) => (
+                                <div key={step.id || idx} className="flex gap-3 items-start">
+                                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${step.completed ? 'bg-green-500' : 'bg-indigo-500 animate-pulse'}`}></div>
+                                  <div>
+                                    <p className="text-[10px] font-extrabold text-slate-700 leading-tight">{step.title}</p>
+                                    {step.description && <p className="text-[9px] text-slate-500 mt-1 line-clamp-1 leading-snug font-medium">{step.description}</p>}
+                                    <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase tracking-wider">{step.date}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* --- FIM PAINEL DE MOVIMENTAÇÕES --- */}
+
                         <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
                            <button onClick={() => window.open(`https://wa.me/55${(c.client?.phone || '11999999999').replace(/\D/g,'')}`, '_blank')} className="text-green-600 bg-green-50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-100 transition">WA</button>
                            {s !== 'sentenca' && <button onClick={() => wrapAction(() => onMove(c.id, s), '', 'Processo avançado!')} className="bg-slate-50 text-indigo-700 px-4 py-2 rounded-xl font-black text-[10px] hover:bg-indigo-50 hover:text-indigo-800 transition shadow-sm border border-slate-200 uppercase tracking-widest">Avançar ➔</button>}
