@@ -102,12 +102,17 @@ const EmptyState = ({ icon: Icon, title, description, action }) => (
 
 const TJSPLink = ({ processNumber, minimal = false }) => {
   if (!processNumber) return null;
-  const cleanNumber = processNumber.replace(/\D/g, '');
-  const url = `https://esaj.tjsp.jus.br/cpopg/show.do?processo.numero=${cleanNumber}`;
+  
+  // O TJSP precisa do número formatado com a máscara CNJ para a pesquisa global funcionar
+  const formattedNumber = applyProcessMask(processNumber);
+  
+  // Utilizamos o endpoint "search.do" (Pesquisa) em vez do "show.do" (Exibição Direta).
+  // O "search.do" pega no número CNJ, pesquisa internamente e redireciona automaticamente para o processo certo!
+  const url = `https://esaj.tjsp.jus.br/cpopg/search.do?cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado=${formattedNumber}&dadosConsulta.valorConsulta=${formattedNumber}`;
   
   if (minimal) return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline inline-flex items-center gap-1 font-mono">
-      {processNumber} <ExternalLink className="w-3 h-3" />
+      {formattedNumber} <ExternalLink className="w-3 h-3" />
     </a>
   );
 
@@ -210,7 +215,8 @@ const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
         <form onSubmit={handleAuth} className="p-10 space-y-4">
           {isRegister && <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Nome do Titular" onChange={e => setForm({...form, name: e.target.value})} />}
           <input required type="email" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="E-mail Profissional" onChange={e => setForm({...form, email: e.target.value})} />
-          <input required type="password" minLength={6} className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Palavra-passe" onChange={e => setForm({...form, password: e.target.value})} />
+          {/* CORREÇÃO: minLength depende de ser Registo ou não, permitindo "admin" no login */}
+          <input required type="password" minLength={isRegister ? 6 : undefined} className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Palavra-passe" onChange={e => setForm({...form, password: e.target.value})} />
           <button disabled={loading} className="w-full py-4 text-white rounded-2xl font-black shadow-xl" style={{ backgroundColor: isRegister ? '#1e293b' : tenantConfig.primaryColor }}>
              {loading ? "A processar..." : (isRegister ? "Configurar Ambiente" : "Entrar no Sistema")}
           </button>
