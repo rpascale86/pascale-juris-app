@@ -563,12 +563,19 @@ export default function App() {
   };
 
   const renderView = () => {
+    // --- REDE DE SEGURANÇA: Previne o erro do menu invisível (cache antigo) ---
+    const safeTenant = {
+      ...tenant,
+      primaryColor: (tenant?.primaryColor && tenant.primaryColor.startsWith('#')) ? tenant.primaryColor : '#1e293b',
+      advogado: tenant?.advogado || tenant?.name || 'Administrador'
+    };
+
     switch(view) {
-      case 'landing': return <LandingPage onNavigate={setView} tenantConfig={tenant} onAddLead={(d)=>apiCall('leads','POST',d)} showToast={showToast} />;
-      case 'login': return <LoginPage onLogin={(l)=>{setTenant(l); setView('dashboard');}} tenantConfig={tenant} showToast={showToast} />;
-      case 'portal': return <ClientPortal onNavigate={setView} caseData={data.cases[0] || null} tenantConfig={tenant} showToast={showToast} />;
-      case 'dashboard': return <LawyerDashboard data={data} isFetching={loading} showToast={showToast} tenantConfig={tenant} onMove={(id, s)=>apiCall(`cases/${id}/move`,'PATCH',{stage: s === 'peticao' ? 'analise_juiz' : 'sentenca'})} onAddCase={(d)=>apiCall('cases','POST',d)} onAddFin={(d)=>apiCall('financials','POST',d)} onAddDoc={(fd)=>apiCall('documents','POST',fd,true)} onLogout={()=>{localStorage.removeItem('pascale_token'); setView('landing');}} />;
-      default: return <LandingPage onNavigate={setView} tenantConfig={tenant} onAddLead={()=>{}} showToast={showToast} />;
+      case 'landing': return <LandingPage onNavigate={setView} tenantConfig={safeTenant} onAddLead={(d)=>apiCall('leads','POST',d)} showToast={showToast} />;
+      case 'login': return <LoginPage onLogin={(l)=>{setTenant(l); setView('dashboard');}} tenantConfig={safeTenant} showToast={showToast} />;
+      case 'portal': return <ClientPortal onNavigate={setView} caseData={data.cases[0] || null} tenantConfig={safeTenant} showToast={showToast} />;
+      case 'dashboard': return <LawyerDashboard data={data} isFetching={loading} showToast={showToast} tenantConfig={safeTenant} onMove={(id, s)=>apiCall(`cases/${id}/move`,'PATCH',{stage: s === 'peticao' ? 'analise_juiz' : 'sentenca'})} onAddCase={(d)=>apiCall('cases','POST',d)} onAddFin={(d)=>apiCall('financials','POST',d)} onAddDoc={(fd)=>apiCall('documents','POST',fd,true)} onLogout={()=>{localStorage.removeItem('pascale_token'); setView('landing');}} />;
+      default: return <LandingPage onNavigate={setView} tenantConfig={safeTenant} onAddLead={()=>{}} showToast={showToast} />;
     }
   };
 
