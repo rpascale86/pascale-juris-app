@@ -213,7 +213,18 @@ const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
       const data = await res.json();
       if (res.ok && data.success) {
         localStorage.setItem('pascale_token', data.token);
-        onLogin(data.lawyer);
+        
+        // Construção Segura da Configuração do Tenant (Rede de Segurança)
+        const lawyerData = data.lawyer || {};
+        const lastName = lawyerData.name ? lawyerData.name.split(' ').pop().toUpperCase() : 'JURIS';
+        const dynamicConfig = {
+          name: lawyerData.officeName || `${lawyerData.name || 'Advogado'} & Associados`,
+          primaryColor: lawyerData.primaryColor || '#4f46e5', // Proteção anti-invisibilidade
+          logoText: lawyerData.officeName ? lawyerData.officeName.substring(0, 12).toUpperCase() : `${lastName} JURIS`,
+          advogado: lawyerData.name || 'Administrador'
+        };
+
+        onLogin(dynamicConfig);
         showToast('Autenticação bem-sucedida!', 'success');
       } else {
         showToast(data.error || 'Credenciais inválidas.', 'error');
@@ -733,6 +744,15 @@ export default function App() {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const [messages, setMessages] = useStickyState([{ id: 1, text: "Olá! Vi que acedeu ao portal. Tem alguma dúvida?", sender: 'bot', time: '10:30' }], 'pascale_messages');
 
+  // Rede de segurança visual: garante que as cores e nomes nunca ficam vazios na aplicação toda
+  const isColorValid = tenant?.primaryColor && tenant.primaryColor.startsWith('#');
+  const safeTenant = {
+    name: tenant?.name || "Escritório",
+    primaryColor: isColorValid ? tenant.primaryColor : "#1e293b", // Força o slate-900 se o cache for antigo
+    logoText: tenant?.logoText || "PASCALE JURIS",
+    advogado: tenant?.advogado || tenant?.name || "Administrador"
+  };
+
   const showToast = useCallback((message, type = 'success') => {
     setToast({ visible: true, message, type });
   }, []);
@@ -791,13 +811,13 @@ export default function App() {
 
   const renderView = () => {
     switch(view) {
-      case 'landing': return <LandingPage onNavigate={setView} onAddLead={handleAddLead} tenantConfig={tenant} showToast={showToast} />;
-      case 'login': return <LoginPage onLogin={(l)=>{setTenant(l); setView('dashboard'); fetchAll();}} tenantConfig={tenant} showToast={showToast} />;
-      case 'portal': return <ClientPortal onNavigate={setView} caseData={data.cases[0] || null} financials={data.fins} messages={messages} onSendMessage={handleSendMessage} tenantConfig={tenant} showToast={showToast} />;
+      case 'landing': return <LandingPage onNavigate={setView} onAddLead={handleAddLead} tenantConfig={safeTenant} showToast={showToast} />;
+      case 'login': return <LoginPage onLogin={(l)=>{setTenant(l); setView('dashboard'); fetchAll();}} tenantConfig={safeTenant} showToast={showToast} />;
+      case 'portal': return <ClientPortal onNavigate={setView} caseData={data.cases[0] || null} financials={data.fins} messages={messages} onSendMessage={handleSendMessage} tenantConfig={safeTenant} showToast={showToast} />;
       case 'dashboard': 
-        if (!localStorage.getItem('pascale_token')) return <LoginPage onLogin={(l)=>{setTenant(l); setView('dashboard'); fetchAll();}} tenantConfig={tenant} showToast={showToast} />;
+        if (!localStorage.getItem('pascale_token')) return <LoginPage onLogin={(l)=>{setTenant(l); setView('dashboard'); fetchAll();}} tenantConfig={safeTenant} showToast={showToast} />;
         return <LawyerDashboard 
-          data={data} isFetching={loading} showToast={showToast} tenantConfig={tenant}
+          data={data} isFetching={loading} showToast={showToast} tenantConfig={safeTenant}
           onMove={(id, stage) => apiCall(`cases/${id}/move`, 'PATCH', { stage: stage === 'peticao' ? 'analise_juiz' : 'sentenca', status: 'Movimentado' })} 
           onAddCase={(d) => apiCall('cases', 'POST', d)} 
           onAddFin={(d) => apiCall('financials', 'POST', d)}
@@ -805,7 +825,7 @@ export default function App() {
           onUpdateLead={(id, status) => { /* Update Lead Status Endpoint futuramente */ return true; }}
           onLogout={()=>{localStorage.removeItem('pascale_token'); setView('landing'); showToast('Sessão terminada.', 'success');}} 
         />;
-      default: return <LandingPage onNavigate={setView} onAddLead={handleAddLead} tenantConfig={tenant} showToast={showToast} />;
+      default: return <LandingPage onNavigate={setView} onAddLead={handleAddLead} tenantConfig={safeTenant} showToast={showToast} />;
     }
   };
 
