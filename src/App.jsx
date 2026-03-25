@@ -187,6 +187,13 @@ const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
 
   const handleAuth = async (e) => {
     e.preventDefault();
+    
+    // NOVA REGRA: Validação via Javascript em vez de HTML
+    if (isRegister && form.password.length < 6) {
+      showToast('Para segurança, a palavra-passe do escritório deve ter pelo menos 6 caracteres.', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/${isRegister ? 'register' : 'login'}`, {
@@ -215,8 +222,8 @@ const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
         <form onSubmit={handleAuth} className="p-10 space-y-4">
           {isRegister && <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Nome do Titular" onChange={e => setForm({...form, name: e.target.value})} />}
           <input required type="email" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="E-mail Profissional" onChange={e => setForm({...form, email: e.target.value})} />
-          {/* CORREÇÃO: minLength depende de ser Registo ou não, permitindo "admin" no login */}
-          <input required type="password" minLength={isRegister ? 6 : undefined} className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Palavra-passe" onChange={e => setForm({...form, password: e.target.value})} />
+          {/* CORREÇÃO DEFINITIVA: Remoção total do minLength do HTML */}
+          <input required type="password" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Palavra-passe" onChange={e => setForm({...form, password: e.target.value})} />
           <button disabled={loading} className="w-full py-4 text-white rounded-2xl font-black shadow-xl" style={{ backgroundColor: isRegister ? '#1e293b' : tenantConfig.primaryColor }}>
              {loading ? "A processar..." : (isRegister ? "Configurar Ambiente" : "Entrar no Sistema")}
           </button>
