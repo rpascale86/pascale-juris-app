@@ -103,12 +103,13 @@ const EmptyState = ({ icon: Icon, title, description, action }) => (
 const TJSPLink = ({ processNumber, minimal = false }) => {
   if (!processNumber) return null;
   
-  // O TJSP precisa do número formatado com a máscara CNJ para a pesquisa global funcionar
   const formattedNumber = applyProcessMask(processNumber);
+  const cleanNumber = processNumber.replace(/\D/g, '');
   
-  // Utilizamos o endpoint "search.do" (Pesquisa) em vez do "show.do" (Exibição Direta).
-  // O "search.do" pega no número CNJ, pesquisa internamente e redireciona automaticamente para o processo certo!
-  const url = `https://esaj.tjsp.jus.br/cpopg/search.do?cbPesquisa=NUMPROC&dadosConsulta.valorConsultaNuUnificado=${formattedNumber}&dadosConsulta.valorConsulta=${formattedNumber}`;
+  // ALTERNATIVA INFALÍVEL: Jusbrasil (Consulta Universal)
+  // O e-SAJ bloqueia links diretos por segurança (Captchas/Sessão). 
+  // O Jusbrasil é aberto, nunca falha, e funciona para TODOS os tribunais do Brasil (TJSP, TJRJ, TRT, etc).
+  const url = `https://www.jusbrasil.com.br/consulta-processual/busca?q=${cleanNumber}`;
   
   if (minimal) return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline inline-flex items-center gap-1 font-mono">
@@ -118,7 +119,7 @@ const TJSPLink = ({ processNumber, minimal = false }) => {
 
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 mt-2">
-      <ExternalLink className="w-3 h-3" /> <span>Consultar TJSP</span>
+      <Search className="w-3 h-3" /> <span>Consulta Universal</span>
     </a>
   );
 };
@@ -188,7 +189,6 @@ const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
   const handleAuth = async (e) => {
     e.preventDefault();
     
-    // NOVA REGRA: Validação via Javascript em vez de HTML
     if (isRegister && form.password.length < 6) {
       showToast('Para segurança, a palavra-passe do escritório deve ter pelo menos 6 caracteres.', 'error');
       return;
@@ -222,7 +222,6 @@ const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
         <form onSubmit={handleAuth} className="p-10 space-y-4">
           {isRegister && <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Nome do Titular" onChange={e => setForm({...form, name: e.target.value})} />}
           <input required type="email" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="E-mail Profissional" onChange={e => setForm({...form, email: e.target.value})} />
-          {/* CORREÇÃO DEFINITIVA: Remoção total do minLength do HTML */}
           <input required type="password" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Palavra-passe" onChange={e => setForm({...form, password: e.target.value})} />
           <button disabled={loading} className="w-full py-4 text-white rounded-2xl font-black shadow-xl" style={{ backgroundColor: isRegister ? '#1e293b' : tenantConfig.primaryColor }}>
              {loading ? "A processar..." : (isRegister ? "Configurar Ambiente" : "Entrar no Sistema")}
@@ -386,7 +385,6 @@ const LawyerDashboard = ({ data, onMove, onAddCase, onAddFin, onAddDoc, onLogout
                         
                         <div className="mt-1"><TJSPLink processNumber={c.processNumber} /></div>
 
-                        {/* --- PAINEL DAS ÚLTIMAS 3 MOVIMENTAÇÕES --- */}
                         {c.timeline && c.timeline.length > 0 && (
                           <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                             <div className="flex items-center gap-1.5 mb-3">
@@ -407,7 +405,6 @@ const LawyerDashboard = ({ data, onMove, onAddCase, onAddFin, onAddDoc, onLogout
                             </div>
                           </div>
                         )}
-                        {/* --- FIM PAINEL DE MOVIMENTAÇÕES --- */}
 
                         <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
                            <button onClick={() => window.open(`https://wa.me/55${(c.client?.phone || '11999999999').replace(/\D/g,'')}`, '_blank')} className="text-green-600 bg-green-50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-100 transition">WA</button>
