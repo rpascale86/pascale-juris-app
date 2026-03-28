@@ -8,7 +8,7 @@ datasource db {
 }
 
 // ------------------------------------------------------
-// 🏢 TENANT: O Advogado / Escritório Dono da Conta
+// 🏢 TENANT: Advogado / Escritório Dono da Conta
 // ------------------------------------------------------
 model Lawyer {
   id            String      @id @default(uuid())
@@ -16,7 +16,7 @@ model Lawyer {
   email         String      @unique
   password      String
   officeName    String?
-  primaryColor  String      @default("#4f46e5")
+  primaryColor  String      @default("#1e293b") // Padrão Enterprise
   
   clients       Client[]
   cases         Case[]
@@ -30,21 +30,14 @@ model Lawyer {
 }
 
 // ------------------------------------------------------
-// 👥 CLIENTES: Base de Contactos do Escritório
+// 👥 CLIENTES: Base Isolada por Tenant
 // ------------------------------------------------------
 model Client {
   id         String      @id @default(uuid())
   name       String
   email      String?
-  cpfCnpj    String?     // Suporta CPF ou CNPJ
-  rg         String?     // Registo Geral / BI
+  cpfCnpj    String?     
   phone      String?
-  
-  // Endereço Completo (Para geração de contratos futuros)
-  address    String?
-  city       String?
-  state      String?
-  zipCode    String?
   
   cases      Case[]
   financials Financial[]
@@ -60,20 +53,17 @@ model Client {
 }
 
 // ------------------------------------------------------
-// ⚖️ PROCESSOS: O Core Business
+// ⚖️ PROCESSOS: Core Business
 // ------------------------------------------------------
 model Case {
   id            String         @id @default(uuid())
   title         String
   processNumber String?
-  notes         String?
-  value         Float?         @default(0) // Valor da Causa / Proveito Económico
+  value         Float?         @default(0)
   
   stage         String         @default("peticao")
   status        String         @default("Novo")
-  priority      String         @default("Normal") // Baixa, Normal, Alta, Urgente
-  court         String?        // Vara ou Tribunal de origem
-  anxietyScore  Int            @default(0) // Termômetro de ansiedade do cliente
+  anxietyScore  Int            @default(0)
   
   client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId      String
@@ -87,12 +77,11 @@ model Case {
 
   @@index([clientId])
   @@index([lawyerId])
-  @@index([stage])
   @@map("cases")
 }
 
 // ------------------------------------------------------
-// ⏳ TIMELINE: Histórico de Andamentos
+// ⏳ TIMELINE: Histórico de Movimentações
 // ------------------------------------------------------
 model CaseTimeline {
   id          String   @id @default(uuid())
@@ -100,6 +89,7 @@ model CaseTimeline {
   description String?
   date        String
   completed   Boolean  @default(false)
+  isCurrent   Boolean  @default(false)
   
   case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseId      String
@@ -118,10 +108,10 @@ model Financial {
   id            String    @id @default(uuid())
   title         String
   amount        Float
-  dueDate       String    // Data de vencimento planeada
-  paymentDate   DateTime? // Data em que foi efetivamente pago
-  type          String    // Pix, Boleto, Cartão, Transferência
-  status        String    @default("Aberto") // Aberto, Pago, Atrasado, Cancelado
+  dueDate       String    
+  paymentDate   DateTime? 
+  type          String    
+  status        String    @default("Aberto") 
   
   client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId      String
@@ -130,21 +120,19 @@ model Financial {
   updatedAt     DateTime  @updatedAt
 
   @@index([clientId])
-  @@index([status])
   @@map("financials")
 }
 
 // ------------------------------------------------------
-// 🎯 LEADS: CRM e Funil de Vendas
+// 🎯 LEADS: Funil de Conversão (Landing Page)
 // ------------------------------------------------------
 model Lead {
   id        String   @id @default(uuid())
   name      String
   email     String?
   phone     String
-  type      String   // Área de interesse (Família, Cível, etc.)
-  status    String   @default("Novo") // Novo, Contactado, Reunião Agendada, Convertido, Perdido
-  notes     String?  // Registo do primeiro atendimento
+  type      String   
+  status    String   @default("Novo") 
   
   lawyer    Lawyer   @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
   lawyerId  String
@@ -153,19 +141,17 @@ model Lead {
   updatedAt DateTime @updatedAt
 
   @@index([lawyerId])
-  @@index([status])
   @@map("leads")
 }
 
 // ------------------------------------------------------
-// 📁 DOCUMENTOS: Arquivo Digital (Supabase)
+// 📁 DOCUMENTOS: Referência do Supabase
 // ------------------------------------------------------
 model Document {
   id        String   @id @default(uuid())
   name      String
-  client    String
+  client    String   // Campo desnormalizado para simplificação de MVP
   size      String   @default("0 MB")
-  fileType  String?  // PDF, JPG, DOCX
   url       String?  
   
   lawyer    Lawyer   @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
