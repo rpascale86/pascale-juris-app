@@ -15,31 +15,46 @@ const prisma = new PrismaClient();
 const app = express();
 
 // ============================================================================
-// --- BLINDAGEM DE SEGURANÇA (ENTERPRISE) ---
+// --- BLINDAGEM DE SEGURANÇA E CORS (ENTERPRISE) ---
 // ============================================================================
-// Helmet: Protege contra vulnerabilidades web conhecidas ocultando headers sensíveis
 app.use(helmet());
 
-// CORS Estrito: Previne que domínios não autorizados consumam a API e façam CSRF
-const allowedOrigins = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5173'];
+// Lista de origens permitidas (Combina a variável de ambiente com fallbacks de segurança)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://pascale-juris-app.vercel.app' // Fallback hardcoded para garantir a Vercel
+];
+
+if (process.env.FRONTEND_URL) {
+  const envOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim().replace(/\/$/, ''));
+  allowedOrigins.push(...envOrigins);
+}
+
 app.use(cors({
   origin: function (origin, callback) {
+    // Permite requisições sem origin (ex: Postman, curl, backend para backend) ou listadas
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn(`[CORS REJEITADO] Origem não autorizada: ${origin}`);
       callback(new Error('Bloqueado pela política de CORS do Servidor.'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json({ limit: '1mb' })); // Previne ataques de payload gigante
+app.use(express.json({ limit: '1mb' }));
 
-// Rate Limiting: Previne ataques de Força Bruta em rotas sensíveis
+// ============================================================================
+// --- RATE LIMITING (PREVENÇÃO DE FORÇA BRUTA E EXAUSTÃO DE RECURSOS) ---
+// ============================================================================
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 20, // Limita a 20 tentativas por IP
-  message: { success: false, error: 'Muitas tentativas de login. Bloqueio temporário ativado.' }
+  message: { success: false, error: 'Muitas tentativas. Bloqueio temporário ativado.' }
 });
 
 const apiLimiter = rateLimit({
@@ -58,7 +73,7 @@ const upload = multer({
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.error("CRÍTICO: JWT_SECRET não definido no ambiente. O sistema não é seguro.");
+  console.error("[CRÍTICO] JWT_SECRET não definido no ambiente. O sistema será encerrado por segurança.");
   process.exit(1);
 }
 
@@ -78,7 +93,7 @@ const requireAuth = (req, res, next) => {
   const token = authHeader.split(' ')[1];
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ success: false, error: 'Sessão expirada ou assinatura inválida.' });
-    req.lawyerId = decoded.lawyerId; // Isolamento absoluto: garante que querys só peguem dados deste tenant
+    req.lawyerId = decoded.lawyerId; // Isolamento absoluto
     next();
   });
 };
@@ -115,23 +130,19 @@ app.post('/api/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // ATENÇÃO: O backdoor hardcoded foi removido. A segurança agora é baseada puramente no hash do banco.
-    // Qualquer usuário de teste DEVE ser criado via script de seed com senha previamente hasheada.
-    
     const lawyer = await prisma.lawyer.findUnique({ where: { email } });
     
     if (!lawyer || !(await bcrypt.compare(password, lawyer.password))) {
       return res.status(401).json({ success: false, error: 'Credenciais inválidas.' });
     }
 
-    const token = jwt.sign({ lawyerId: lawyer.id }, JWT_SECRET, { expiresIn: '12h' }); // Tempo de expiração reduzido por segurança
+    const token = jwt.sign({ lawyerId: lawyer.id }, JWT_SECRET, { expiresIn: '12h' }); 
     res.json({ success: true, token, lawyer: { name: lawyer.name, primaryColor: lawyer.primaryColor } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Erro de processamento na camada de autenticação.' });
   }
 });
 
-// Captura de Leads via Landing Page (Aberto)
 app.post('/api/leads', async (req, res) => {
   try {
     const { name, phone, type } = req.body;
@@ -156,7 +167,6 @@ app.post('/api/leads', async (req, res) => {
 // --- ENDPOINTS PRIVADOS (Isolamento via req.lawyerId garantido) ---
 // ============================================================================
 
-// --- PROCESSOS (CASES) ---
 app.get('/api/cases', requireAuth, async (req, res) => {
   try {
     const cases = await prisma.case.findMany({
@@ -205,7 +215,6 @@ app.patch('/api/cases/:id/move', requireAuth, async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, error: 'Acesso negado ou registro inexistente.' }); }
 });
 
-// --- LEADS CRM ---
 app.get('/api/leads', requireAuth, async (req, res) => {
   try {
     const leads = await prisma.lead.findMany({ where: { lawyerId: req.lawyerId }, orderBy: { createdAt: 'desc' } });
@@ -213,7 +222,6 @@ app.get('/api/leads', requireAuth, async (req, res) => {
   } catch (error) { res.status(500).json({ success: false }); }
 });
 
-// --- FINANCEIRO ---
 app.get('/api/financials', requireAuth, async (req, res) => {
   try {
     const fins = await prisma.financial.findMany({
@@ -240,7 +248,6 @@ app.post('/api/financials', requireAuth, async (req, res) => {
 
 app.patch('/api/financials/:id/pay', requireAuth, async (req, res) => {
   try {
-    // Camada extra de segurança para garantir que a fatura pertence ao tenant
     const verifyOwnership = await prisma.financial.findFirst({
       where: { id: req.params.id, client: { lawyerId: req.lawyerId } }
     });
@@ -254,7 +261,6 @@ app.patch('/api/financials/:id/pay', requireAuth, async (req, res) => {
   } catch (error) { res.status(500).json({ success: false }); }
 });
 
-// --- DOCUMENTOS (SUPABASE) ---
 app.get('/api/documents', requireAuth, async (req, res) => {
   try {
     const docs = await prisma.document.findMany({ where: { lawyerId: req.lawyerId }, orderBy: { createdAt: 'desc' } });
@@ -307,6 +313,5 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`\n⚖️ [PASCALE JURIS SAAS] Motor Backend Online na Porta ${PORT}`);
-  console.log(`🛡️ Camadas de Segurança (Helmet, RateLimit, CORS Rigoroso) Ativadas`);
+  console.log(`\n[API SERVER] Operacional na Porta ${PORT}`);
 });
