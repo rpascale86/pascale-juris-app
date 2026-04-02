@@ -1,15 +1,53 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Gavel, Users, FileText, MessageSquare, Bell, Menu, CheckCircle, 
-  Clock, AlertTriangle, ArrowRight, ShieldCheck, LogOut, Activity, Plus, 
-  Send, X, UploadCloud, File, Download, DollarSign, TrendingUp, FolderOpen,
-  Briefcase, Search, ExternalLink, Info, Filter
+  Gavel, 
+  Users, 
+  FileText, 
+  MessageSquare, 
+  Bell, 
+  Search, 
+  Menu, 
+  CheckCircle, 
+  Clock, 
+  AlertTriangle, 
+  ChevronRight, 
+  ArrowRight, 
+  ShieldCheck, 
+  Smartphone,
+  LogOut,
+  MoreVertical,
+  Activity,
+  Plus,
+  Send,
+  X,
+  UploadCloud,
+  File,
+  Paperclip,
+  Mic,
+  Lock,
+  Download,
+  Eye,
+  DollarSign,
+  CreditCard,
+  PieChart,
+  TrendingUp,
+  Calendar
 } from 'lucide-react';
 
-// ============================================================================
-// --- CONFIGURAÇÃO CENTRALIZADA DA NUVEM ---
-// ============================================================================
+// --- CONFIGURAÇÃO DA NUVEM E DADOS INICIAIS ---
 const API_URL = 'https://pascale-juris-app.onrender.com/api'; 
+
+const TENANT_CONFIG = {
+  name: "Renzo Advogados",
+  primaryColor: "bg-slate-900",
+  secondaryColor: "text-slate-900",
+  logoText: "RENZO JURIS",
+  advogado: "Dr. Renzo"
+};
+
+const DEFAULT_MESSAGES = [
+  { id: 1, text: "Olá! Vi que acessou o portal. Tem alguma dúvida?", sender: 'bot', time: '10:30' }
+];
 
 // --- HOOKS DE PERSISTÊNCIA ---
 const useStickyState = (defaultValue, key) => {
@@ -17,539 +55,977 @@ const useStickyState = (defaultValue, key) => {
     const stickyValue = window.localStorage.getItem(key);
     return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
   });
-  useEffect(() => { window.localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
+  useEffect(() => {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
   return [value, setValue];
 };
 
-// --- UTILITÁRIOS ---
-const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+// --- FUNÇÕES UTILITÁRIAS GLOBAIS ---
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+};
 
 const formatDate = (dateString) => {
   if (!dateString) return '';
   if (dateString.includes('-')) {
-    const [year, month, day] = dateString.split('-');
+    const [year, month, day] = dateString.split('T')[0].split('-');
     return `${day}/${month}/${year}`;
   }
   return dateString;
 };
 
-const applyProcessMask = (v) => {
-  v = v.replace(/\D/g, '');
-  if (v.length <= 7) return v;
-  if (v.length <= 9) return v.replace(/(\d{7})(\d{2})/, '$1-$2');
-  if (v.length <= 13) return v.replace(/(\d{7})(\d{2})(\d{4})/, '$1-$2.$3');
-  if (v.length <= 14) return v.replace(/(\d{7})(\d{2})(\d{4})(\d{1})/, '$1-$2.$3.$4');
-  if (v.length <= 16) return v.replace(/(\d{7})(\d{2})(\d{4})(\d{1})(\d{2})/, '$1-$2.$3.$4.$5');
-  return v.replace(/(\d{7})(\d{2})(\d{4})(\d{1})(\d{2})(\d{4})/, '$1-$2.$3.$4.$5.$6').slice(0, 25);
+const applyPhoneMask = (value) => {
+  let v = value.replace(/\D/g, ''); 
+  if (v.length <= 2) return v.replace(/(\d{2})/, '($1');
+  if (v.length <= 7) return v.replace(/(\d{2})(\d{1,5})/, '($1) $2');
+  return v.replace(/(\d{2})(\d{5})(\d{1,4})/, '($1) $2-$3').slice(0, 15);
 };
 
-const applyPhoneMask = (v) => {
-  v = v.replace(/\D/g, '');
-  if (v.length <= 11) {
-    if (v.length <= 2) return v.replace(/(\d{2})/, '($1');
-    if (v.length <= 7) return v.replace(/(\d{2})(\d{1,5})/, '($1) $2');
-    return v.replace(/(\d{2})(\d{5})(\d{1,4})/, '($1) $2-$3');
-  }
-  return v.slice(0, 15);
+const applyCpfMask = (value) => {
+  let v = value.replace(/\D/g, '');
+  if (v.length <= 3) return v;
+  if (v.length <= 6) return v.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+  if (v.length <= 9) return v.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+  return v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4').slice(0, 14);
 };
 
-const applyCpfCnpjMask = (v) => {
-  let value = v.replace(/\D/g, '');
-  if (value.length <= 11) {
-    return value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/g, "\$1.\$2.\$3-\$4").slice(0, 14);
-  }
-  return value.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/g, "\$1.\$2.\$3/\$4-\$5").slice(0, 18);
-};
-
-// ============================================================================
-// --- COMPONENTES UI PREMIUM ---
-// ============================================================================
-const Toast = ({ message, type, onClose }) => {
-  useEffect(() => { const timer = setTimeout(onClose, 4000); return () => clearTimeout(timer); }, [onClose]);
-  const bg = type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-indigo-600';
-  return (
-    <div className={`fixed bottom-6 right-6 ${bg} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-up z-[200]`}>
-      {type === 'error' ? <AlertTriangle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
-      <span className="font-bold text-sm tracking-tight">{message}</span>
-      <button onClick={onClose} className="ml-2 hover:bg-white/20 p-1 rounded-full transition"><X className="w-4 h-4" /></button>
-    </div>
-  );
-};
-
+// --- COMPONENTES DE INTERFACE ---
 const Modal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl overflow-hidden animate-slide-up border border-white/20">
-        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[90vh]">
+        <div className="p-4 border-b flex justify-between items-center bg-slate-50 flex-shrink-0">
+          <h3 className="font-bold text-lg text-slate-800">{title}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition text-slate-500"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-8 max-h-[75vh] overflow-y-auto custom-scrollbar">{children}</div>
+        <div className="p-6 overflow-y-auto custom-scrollbar">
+          {children}
+        </div>
       </div>
     </div>
   );
 };
 
-const EmptyState = ({ icon: Icon, title, description, action }) => (
-  <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-white rounded-[3rem] border border-dashed border-slate-200">
-    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6"><Icon className="w-10 h-10 text-slate-300" /></div>
-    <h3 className="text-xl font-extrabold text-slate-800 mb-2 tracking-tight">{title}</h3>
-    <p className="text-slate-400 text-sm max-w-md mx-auto mb-8 font-medium">{description}</p>
-    {action}
-  </div>
-);
-
-const TJSPLink = ({ processNumber, minimal = false }) => {
-  if (!processNumber) return null;
-  
-  const formattedNumber = applyProcessMask(processNumber);
-  const cleanNumber = processNumber.replace(/\D/g, '');
-  
-  // ALTERNATIVA INFALÍVEL: Jusbrasil (Consulta Universal)
-  // O e-SAJ bloqueia links diretos por segurança (Captchas/Sessão). 
-  // O Jusbrasil é aberto, nunca falha, e funciona para TODOS os tribunais do Brasil (TJSP, TJRJ, TRT, etc).
-  const url = `https://www.jusbrasil.com.br/consulta-processual/busca?q=${cleanNumber}`;
-  
-  if (minimal) return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline inline-flex items-center gap-1 font-mono">
-      {formattedNumber} <ExternalLink className="w-3 h-3" />
-    </a>
-  );
-
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 mt-2">
-      <Search className="w-3 h-3" /> <span>Consulta Universal</span>
-    </a>
-  );
-};
 
 // ============================================================================
-// 1. LANDING PAGE
+// 0. PÁGINA DE LOGIN
 // ============================================================================
-const LandingPage = ({ onNavigate, onAddLead, tenantConfig, showToast }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', phone: '', email: '', type: 'Imobiliário' });
-  const [isSending, setIsSending] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSending(true);
-    await onAddLead(formData);
-    setIsSending(false);
-    showToast("Pedido enviado com sucesso!", "success");
-    setIsModalOpen(false);
-  };
-
-  return (
-    <div className="font-sans text-slate-800 bg-white min-h-screen flex flex-col">
-      <header className="px-6 py-5 flex justify-between items-center border-b border-slate-100 sticky top-0 bg-white/90 backdrop-blur-md z-50">
-        <div className="flex items-center gap-3 font-extrabold text-2xl cursor-pointer" style={{ color: tenantConfig.primaryColor }} onClick={() => onNavigate('login')}>
-          <div className="p-2 rounded-xl text-white shadow-md" style={{ backgroundColor: tenantConfig.primaryColor }}><Gavel className="w-6 h-6" /></div>
-          {tenantConfig.logoText}
-        </div>
-        <button onClick={() => onNavigate('portal')} className="px-5 py-2.5 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition shadow-sm">Área do Cliente</button>
-      </header>
-
-      <main className="flex-1 max-w-7xl mx-auto px-6 py-20 text-center lg:text-left flex flex-col lg:flex-row items-center gap-16">
-        <div className="flex-1 space-y-8 animate-fade-in">
-            <span className="inline-block px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-xs font-black uppercase tracking-widest border border-indigo-100">Escritório Digital 4.0</span>
-            <h1 className="text-5xl md:text-7xl font-black leading-[1.1] text-slate-900 tracking-tighter">O seu processo,<br/><span style={{ color: tenantConfig.primaryColor }}>sem juridiquês.</span></h1>
-            <p className="text-xl text-slate-500 leading-relaxed font-medium">Acompanhe o seu caso judicial em tempo real através do seu telemóvel. Transparência total e consulta direta ao TJSP.</p>
-            <div className="flex flex-col sm:flex-row gap-4 pt-6 justify-center lg:justify-start">
-              <button onClick={() => setIsModalOpen(true)} className="px-10 py-5 text-white rounded-2xl font-black text-lg shadow-2xl hover:-translate-y-1 transition transform" style={{ backgroundColor: tenantConfig.primaryColor }}>Avaliar o Meu Caso</button>
-              <button onClick={() => onNavigate('portal')} className="px-10 py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl font-black text-lg hover:bg-slate-50 transition">Já sou Cliente</button>
-            </div>
-        </div>
-        <div className="flex-1 hidden lg:block animate-fade-in relative">
-           <div className="absolute -inset-10 bg-indigo-500/10 blur-[100px] rounded-full"></div>
-           <img src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=800" alt="Law" className="rounded-[3rem] shadow-2xl relative z-10 grayscale-[0.2]" />
-        </div>
-      </main>
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Análise Gratuita">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Nome Completo" onChange={e => setFormData({...formData, name: e.target.value})} />
-          <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="WhatsApp" value={formData.phone} onChange={e => setFormData({...formData, phone: applyPhoneMask(e.target.value)})} />
-          <button className="w-full py-4 text-white rounded-2xl font-black shadow-xl" style={{ backgroundColor: tenantConfig.primaryColor }}>Solicitar Contacto do Advogado</button>
-        </form>
-      </Modal>
-    </div>
-  );
-};
-
-// ============================================================================
-// 2. LOGIN PAGE
-// ============================================================================
-const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
-  const [isRegister, setIsRegister] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', name: '', officeName: '' });
+const LoginPage = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleAuth = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    
-    if (isRegister && form.password.length < 6) {
-      showToast('Para segurança, a palavra-passe do escritório deve ter pelo menos 6 caracteres.', 'error');
-      return;
-    }
-
     setLoading(true);
+    setErrorMsg('');
+    
     try {
-      const res = await fetch(`${API_URL}/${isRegister ? 'register' : 'login'}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form)
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       });
       const data = await res.json();
+      
       if (res.ok && data.success) {
         localStorage.setItem('pascale_token', data.token);
-        onLogin(data.lawyer);
-        showToast('Acesso autorizado!', 'success');
-      } else showToast(data.error || 'Erro na autenticação.', 'error');
-    } catch (err) { showToast('Servidor offline. Tente em 30 segundos.', 'error'); }
-    finally { setLoading(false); }
+        if(data.lawyer?.primaryColor) {
+           localStorage.setItem('pascale_tenant_config', JSON.stringify({...TENANT_CONFIG, primaryColor: data.lawyer.primaryColor}));
+        }
+        onLogin(); 
+      } else {
+        setErrorMsg(data.error || 'Credenciais inválidas.');
+      }
+    } catch (err) {
+      setErrorMsg('Servidor offline. Tente novamente mais tarde.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-slide-up">
-        <div className="p-12 text-center text-white" style={{ backgroundColor: isRegister ? '#1e293b' : tenantConfig.primaryColor }}>
-          <div className="w-20 h-20 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-md">
-            {isRegister ? <ShieldCheck className="w-10 h-10" /> : <Gavel className="w-10 h-10" />}
+      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+        <div className="bg-slate-800 p-8 text-center border-b-4 border-indigo-500">
+          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-inner">
+            <Gavel className="w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-black tracking-tighter uppercase">{isRegister ? "Criar Escritório" : tenantConfig.logoText}</h1>
-          <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mt-2">Plataforma SaaS Profissional</p>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">{TENANT_CONFIG.logoText}</h1>
+          <p className="text-slate-300 text-xs font-bold uppercase tracking-widest mt-2">Acesso Restrito</p>
         </div>
-        <form onSubmit={handleAuth} className="p-10 space-y-4">
-          {isRegister && <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Nome do Titular" onChange={e => setForm({...form, name: e.target.value})} />}
-          <input required type="email" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="E-mail Profissional" onChange={e => setForm({...form, email: e.target.value})} />
-          <input required type="password" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none" placeholder="Palavra-passe" onChange={e => setForm({...form, password: e.target.value})} />
-          <button disabled={loading} className="w-full py-4 text-white rounded-2xl font-black shadow-xl" style={{ backgroundColor: isRegister ? '#1e293b' : tenantConfig.primaryColor }}>
-             {loading ? "A processar..." : (isRegister ? "Configurar Ambiente" : "Entrar no Sistema")}
-          </button>
-          <button type="button" onClick={() => setIsRegister(!isRegister)} className="w-full mt-4 text-xs font-black text-slate-400 uppercase tracking-tighter">
-            {isRegister ? "Já possui conta? Fazer Login" : "Registar Novo Escritório"}
-          </button>
-        </form>
+        <div className="p-8">
+          <form onSubmit={handleLogin} className="space-y-4">
+            {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-200 text-center">{errorMsg}</div>}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail Corporativo</label>
+              <input 
+                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="renzo@advocacia.com.br"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
+              <input 
+                type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••"
+              />
+            </div>
+            <button type="submit" disabled={loading} className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition flex justify-center items-center">
+              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Acessar o Sistema"}
+            </button>
+          </form>
+          <div className="mt-4 text-center">
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Login Demo: admin / admin</p>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 // ============================================================================
-// 3. PORTAL DO CLIENTE
+// 1. LANDING PAGE (SITE PÚBLICO)
 // ============================================================================
-const ClientPortal = ({ onNavigate, caseData, tenantConfig, showToast }) => {
-  if (!caseData) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
-      <Search className="w-12 h-12 mb-4 opacity-20" />
-      <p className="font-bold">Nenhum processo localizado para o seu perfil.</p>
-      <button onClick={() => onNavigate('landing')} className="mt-4 text-indigo-600 font-bold hover:underline">Voltar ao site</button>
-    </div>
-  );
+const LandingPage = ({ onNavigate, onAddLead }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({ name: '', phone: '', type: 'Usucapião' });
+  const [showNotification, setShowNotification] = useState(false);
 
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-20">
-      <header className="p-8 text-white rounded-b-[3rem] shadow-xl" style={{ backgroundColor: tenantConfig.primaryColor }}>
-         <button onClick={() => onNavigate('landing')} className="mb-6 opacity-60 hover:opacity-100 flex items-center gap-2 font-bold text-xs uppercase tracking-widest"><ArrowRight className="w-4 h-4 rotate-180" /> Voltar</button>
-         <h1 className="text-3xl font-black tracking-tight">Olá, {caseData.client?.name || caseData.client}</h1>
-         <p className="opacity-70 mt-1 font-medium tracking-tight">O seu processo está estável e monitorizado.</p>
-      </header>
-
-      <div className="px-6 -mt-8 max-w-lg mx-auto space-y-6">
-         <div className="bg-white rounded-[2rem] p-8 shadow-xl border border-slate-100 relative overflow-hidden">
-            <div className="absolute right-0 top-0 w-20 h-20 bg-indigo-50/50 rounded-bl-full"></div>
-            <div className="flex justify-between items-start mb-6">
-              <div className="relative z-10">
-                <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg uppercase tracking-widest">Processo Ativo</span>
-                <h2 className="text-xl font-black text-slate-800 mt-3 leading-tight">{caseData.title}</h2>
-                <div className="mt-2"><TJSPLink processNumber={caseData.processNumber} /></div>
-              </div>
-              <Activity className="w-6 h-6 text-green-500 animate-pulse relative z-10" />
-            </div>
-            <div className="space-y-3 relative z-10 bg-slate-50 p-4 rounded-xl border border-slate-100">
-               <div className="flex justify-between text-[11px] font-black text-slate-500 uppercase"><span>Evolução Estimada</span><span className="text-indigo-600">60%</span></div>
-               <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div className="w-[60%] h-full bg-indigo-500"></div></div>
-            </div>
-         </div>
-
-         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100">
-            <h3 className="font-black text-slate-800 mb-8 flex items-center gap-3 text-sm uppercase tracking-widest"><Clock className="w-5 h-5 text-indigo-600" /> Histórico do Caso</h3>
-            <div className="space-y-10 relative">
-               <div className="absolute left-[13px] top-2 bottom-4 w-[2px] bg-slate-100"></div>
-               {caseData.timeline?.length > 0 ? caseData.timeline.map((step) => (
-                 <div key={step.id} className="relative z-10 flex gap-5">
-                    <div className={`w-7 h-7 rounded-full border-[3px] flex-shrink-0 flex items-center justify-center bg-white ${step.completed ? 'border-green-500 text-green-500' : 'border-indigo-600 ring-4 ring-indigo-50'}`}>
-                      {step.completed ? <CheckCircle className="w-4 h-4 fill-current" /> : <div className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-pulse"></div>}
-                    </div>
-                    <div>
-                      <h4 className="font-black text-slate-800 text-sm tracking-tight">{step.title}</h4>
-                      <span className="text-[10px] text-indigo-600 font-extrabold uppercase bg-indigo-50 px-2 py-0.5 rounded block w-max mb-2">{step.date}</span>
-                      <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50 p-4 rounded-2xl border border-slate-100">{step.description}</p>
-                    </div>
-                 </div>
-               )) : <p className="text-xs text-slate-400 font-bold ml-10">Processo iniciado. Aguarde atualizações...</p>}
-            </div>
-         </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// 4. PAINEL DO ADVOGADO (ENTERPRISE DASHBOARD)
-// ============================================================================
-const LawyerDashboard = ({ data, onMove, onAddCase, onAddFin, onAddDoc, onLogout, tenantConfig, showToast, isFetching }) => {
-  const [tab, setTab] = useState('kanban');
-  const [modals, setModals] = useState({ case: false, fin: false, doc: false });
-  const [fCase, setFCase] = useState({ client: '', title: '', phone: '', processNumber: '', value: '' });
-  const [fFin, setFFin] = useState({ client: '', amount: '', dueDate: '', title: 'Honorários', type: 'Boleto' });
-  const [file, setFile] = useState(null);
-  const [docClient, setDocClient] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const activeClients = useMemo(() => Array.from(new Set(data.cases.map(c => c.client?.name || c.client))).filter(Boolean), [data.cases]);
-
-  const wrapAction = async (fn, modalKey, msg) => {
-    setActionLoading(true);
-    const success = await fn();
-    if (success) {
-      setModals(m => ({ ...m, [modalKey]: false }));
-      showToast(msg, 'success');
-    } else showToast('Erro ao processar pedido.', 'error');
-    setActionLoading(false);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const rawPhone = formData.phone.replace(/\D/g, '');
+    if (rawPhone.length < 10) {
+      alert("Por favor, digite um número de celular válido com o DDD.");
+      return;
+    }
+    onAddLead({ name: formData.name, phone: formData.phone, type: formData.type });
+    setFormData({ name: '', phone: '', type: 'Usucapião' });
+    setIsModalOpen(false);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 4000);
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      <aside className="w-72 text-white flex flex-col p-8 space-y-8 shadow-2xl z-50 relative overflow-hidden" style={{ backgroundColor: tenantConfig.primaryColor }}>
-        <div className="absolute top-0 left-0 w-full h-64 bg-white/5 blur-3xl rounded-full"></div>
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="p-3 bg-white/10 rounded-2xl border border-white/10"><Gavel className="w-6 h-6" /></div>
-          <div>
-            <div className="font-black text-lg tracking-tighter uppercase leading-none">{tenantConfig.logoText}</div>
-            <div className="text-[9px] font-bold text-white/50 uppercase tracking-[0.2em] mt-1.5">Enterprise</div>
+    <div className="font-sans text-slate-800 bg-white min-h-screen flex flex-col">
+      {showNotification && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200] bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-slide-up">
+          <CheckCircle className="w-5 h-5" />
+          <span className="font-bold text-sm">Solicitação enviada com sucesso!</span>
+        </div>
+      )}
+
+      <header className="px-6 py-4 flex justify-between items-center border-b shadow-sm sticky top-0 bg-white z-50">
+        <div className="flex items-center gap-2 font-bold text-xl text-indigo-900 cursor-pointer" onClick={() => onNavigate('login')}>
+          <Gavel className="w-6 h-6" />
+          {TENANT_CONFIG.logoText}
+        </div>
+        <button onClick={() => onNavigate('portal')} className="px-4 py-2 bg-indigo-100 text-indigo-900 rounded-lg font-medium hover:bg-indigo-200 transition">
+          Área do Cliente
+        </button>
+      </header>
+
+      <main className="flex-1">
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Iniciar Consulta Gratuita">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
+              <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: João Silva" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Celular</label>
+              <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="(11) 99999-9999" value={formData.phone} onChange={e => setFormData({...formData, phone: applyPhoneMask(e.target.value)})} />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Caso</label>
+              <select className="w-full p-3 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+                <option value="Usucapião">Usucapião (Imobiliário)</option>
+                <option value="Trabalhista">Trabalhista</option>
+                <option value="Cível">Cível / Consumidor</option>
+                <option value="Família">Família (Divórcio/Pensão)</option>
+                <option value="Empresarial">Empresarial</option>
+              </select>
+            </div>
+            <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">Enviar Pedido</button>
+          </form>
+        </Modal>
+
+        <section className="px-6 py-20 md:py-32 max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1 space-y-6 animate-fade-in">
+            <span className="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold tracking-wide uppercase">ADVOCACIA DIGITAL</span>
+            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight text-slate-900 tracking-tight">Seu processo jurídico, <span className="text-indigo-600">sem segredos.</span></h1>
+            <p className="text-lg text-slate-600 leading-relaxed">Na {TENANT_CONFIG.name}, não precisa ligar para saber o que está acontecendo. Acompanhe cada passo do seu caso em tempo real pelo nosso aplicativo exclusivo.</p>
+            <div className="flex gap-4 pt-4">
+              <button onClick={() => setIsModalOpen(true)} className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1">Iniciar Consulta</button>
+              <button onClick={() => onNavigate('portal')} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:border-indigo-600 transition">Já sou Cliente</button>
+            </div>
+          </div>
+          <div className="flex-1 flex justify-center relative animate-fade-in" style={{animationDelay: '0.2s'}}>
+              <div className="absolute -inset-4 bg-indigo-500/20 blur-3xl rounded-full"></div>
+              <div className="relative w-72 h-[550px] bg-slate-900 rounded-[3rem] border-8 border-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/20">
+                <div className="absolute top-0 w-full h-full bg-slate-50 flex flex-col p-6 pt-12 space-y-4">
+                   <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm shadow-sm">L</div>
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Bem-vindo</div>
+                        <div className="font-bold text-slate-800 text-sm tracking-tight">Carlos Silva</div>
+                      </div>
+                   </div>
+                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                      <div className="text-[10px] text-green-600 font-bold mb-1">MOVIMENTAÇÃO RECENTE</div>
+                      <div className="font-bold text-slate-800 text-xs">Juiz recebeu documentos</div>
+                      <div className="w-full bg-slate-100 h-1 mt-3 rounded-full overflow-hidden"><div className="w-3/5 h-full bg-indigo-500"></div></div>
+                   </div>
+                   <div className="bg-indigo-600 p-4 rounded-xl shadow-lg text-white">
+                      <div className="font-bold text-sm mb-1">Precisa de ajuda?</div>
+                      <div className="text-[10px] opacity-80 mb-3 leading-tight">Fale com o seu advogado agora mesmo.</div>
+                      <div className="w-full py-2 bg-white/10 rounded text-center text-xs font-bold">Abrir Chat</div>
+                   </div>
+                </div>
+              </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+};
+
+// ============================================================================
+// 2. PORTAL DO CLIENTE
+// ============================================================================
+const ClientPortal = ({ onNavigate, caseData, onNotifyLawyer, messages, onSendMessage, onUploadDocument, financials }) => {
+  const [chatOpen, setChatOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [financialOpen, setFinancialOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const chatEndRef = useRef(null);
+  const [file, setFile] = useState(null);
+
+  const { myFinancials, totalPendente } = useMemo(() => {
+    if (!caseData) return { myFinancials: [], totalPendente: 0 };
+    const filtered = financials.filter(f => f.client === caseData.client);
+    const total = filtered.filter(f => f.status !== 'Pago').reduce((acc, curr) => acc + curr.amount, 0);
+    return { myFinancials: filtered, totalPendente: total };
+  }, [financials, caseData]);
+
+  useEffect(() => {
+    if (chatOpen && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, chatOpen]);
+
+  const handleUpload = () => {
+    if(!file) return;
+    setIsUploading(true);
+    setTimeout(() => {
+      setIsUploading(false);
+      setUploadOpen(false);
+      onUploadDocument({ name: file.name, client: caseData.client, file: file });
+      onNotifyLawyer(`Novo Documento Recebido de ${caseData.client}.`);
+      setShowNotification(true);
+      setFile(null);
+      setTimeout(() => setShowNotification(false), 3000);
+    }, 1500);
+  };
+
+  const handleSendMessage = () => {
+    if (!inputValue.trim()) return;
+    onSendMessage(inputValue, 'user');
+    setInputValue('');
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      onSendMessage("Anotado! Notifiquei o advogado para que ele analise assim que possível.", 'bot');
+      onNotifyLawyer(`Mensagem de ${caseData?.client || 'Cliente'} no chat.`);
+    }, 1500);
+  };
+
+  if (!caseData) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400">
+      <Activity className="w-12 h-12 mb-4 text-slate-300 animate-spin" />
+      <p>Aguardando dados da nuvem...</p>
+      <button onClick={() => onNavigate('landing')} className="mt-4 text-indigo-600 font-bold hover:underline">Voltar</button>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans pb-20 overflow-x-hidden">
+      {showNotification && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200] bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-slide-up">
+          <UploadCloud className="w-5 h-5" />
+          <span className="font-bold text-sm">Documento enviado com sucesso!</span>
+        </div>
+      )}
+
+      <Modal isOpen={financialOpen} onClose={() => setFinancialOpen(false)} title="Financeiro">
+        <div className="space-y-4">
+          <div className="bg-indigo-50 p-4 rounded-lg flex justify-between items-center mb-4 border border-indigo-100">
+             <span className="text-sm font-bold text-indigo-900">Total Pendente</span>
+             <span className="text-xl font-extrabold text-indigo-700">
+               {formatCurrency(totalPendente)}
+             </span>
+          </div>
+          <div className="space-y-3">
+             {myFinancials.map(fin => (
+               <div key={fin.id} className="border border-slate-200 rounded-lg p-3 flex justify-between items-center bg-white shadow-sm">
+                 <div>
+                   <div className="font-bold text-slate-800 text-sm tracking-tight">{fin.title}</div>
+                   <div className="text-[10px] text-slate-400">Vencimento: {formatDate(fin.dueDate)}</div>
+                 </div>
+                 <div className="text-right">
+                   <div className="font-bold text-slate-800 text-sm">{formatCurrency(fin.amount)}</div>
+                   <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                     {fin.status}
+                   </span>
+                 </div>
+               </div>
+             ))}
+             {myFinancials.length === 0 && <p className="text-center text-slate-400 text-xs font-bold py-4">Nenhuma cobrança ativa.</p>}
           </div>
         </div>
-        <nav className="flex-1 space-y-3 relative z-10 mt-12">
-          {[
-            {id: 'kanban', icon: Activity, label: 'Painel Kanban'},
-            {id: 'leads', icon: Users, label: 'CRM de Leads'},
-            {id: 'docs', icon: FolderOpen, label: 'Arquivo Digital'},
-            {id: 'finance', icon: DollarSign, label: 'Financeiro'}
-          ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all ${tab === t.id ? 'bg-white/20 shadow-xl translate-x-2' : 'opacity-60 hover:opacity-100 hover:bg-white/10'}`}>
-              <t.icon className="w-5 h-5" /> <span>{t.label}</span>
-            </button>
-          ))}
+      </Modal>
+
+      <Modal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} title="Enviar Documento">
+        {!isUploading ? (
+          <div className="space-y-6">
+            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-400 hover:bg-indigo-50 transition cursor-pointer relative">
+              <UploadCloud className="w-12 h-12 mb-2 text-indigo-300" />
+              <p className="text-sm font-bold text-slate-600">{file ? file.name : "Clique para anexar arquivo"}</p>
+              <p className="text-[10px]">PDF, JPG ou PNG (Max 5MB)</p>
+              <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setFile(e.target.files[0])} />
+            </div>
+            <button disabled={!file} onClick={handleUpload} className="w-full py-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg shadow-indigo-200 uppercase tracking-wide text-xs disabled:opacity-50">Confirmar Envio Seguro</button>
+          </div>
+        ) : (
+          <div className="py-10 text-center space-y-4">
+             <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
+             <p className="text-indigo-900 font-bold animate-pulse text-sm">Processando e Criptografando...</p>
+          </div>
+        )}
+      </Modal>
+
+      {chatOpen && (
+        <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-up md:max-w-md md:right-4 md:left-auto md:bottom-4 md:top-auto md:h-[600px] md:shadow-2xl md:rounded-2xl border-slate-200">
+          <div className="bg-indigo-900 text-white p-4 flex justify-between items-center md:rounded-t-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">
+                {TENANT_CONFIG.advogado.substring(4, 6).toUpperCase()}
+              </div>
+              <div><div className="font-bold text-sm leading-none mb-1">{TENANT_CONFIG.advogado}</div><div className="text-[10px] opacity-70 flex items-center gap-1"><div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div> Disponível agora</div></div>
+            </div>
+            <button onClick={() => setChatOpen(false)} className="p-1"><X className="w-6 h-6" /></button>
+          </div>
+          <div className="flex-1 bg-slate-100 p-4 space-y-4 overflow-y-auto">
+            {messages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`p-3 rounded-2xl text-sm max-w-[85%] shadow-sm ${msg.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none'}`}>{msg.text}</div>
+              </div>
+            ))}
+            {isTyping && <div className="text-[10px] text-slate-400 italic">{TENANT_CONFIG.advogado} está digitando...</div>}
+            <div ref={chatEndRef} />
+          </div>
+          <div className="p-4 bg-white border-t flex gap-2 md:rounded-b-2xl">
+            <input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 bg-slate-100 rounded-full px-4 text-sm outline-none border border-transparent focus:border-indigo-500 transition" placeholder="Escreva a sua dúvida..." />
+            <button onClick={handleSendMessage} className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg flex-shrink-0 transition hover:bg-indigo-700"><Send className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
+
+      <div className={`${TENANT_CONFIG.primaryColor} text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg`}>
+        <div className="flex justify-between items-center mb-8">
+           <button onClick={() => onNavigate('landing')} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ArrowRight className="w-5 h-5 rotate-180" /></button>
+           <span className="font-bold text-[10px] uppercase tracking-[0.2em] opacity-70">Painel do Cliente</span>
+           <div className="relative"><Bell className="w-5 h-5 opacity-70" /><div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900"></div></div>
+        </div>
+        <div className="flex flex-col items-center">
+           <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold mb-4 shadow-xl ring-2 ring-white/10">
+             {caseData.client ? caseData.client.substring(0,2).toUpperCase() : 'CS'}
+           </div>
+           <h1 className="text-2xl font-bold tracking-tight">Olá, {caseData.client}</h1>
+           <p className="opacity-70 text-sm mt-1 font-medium">Seu processo está estável e monitorado.</p>
+        </div>
+      </div>
+
+      <div className="px-6 -mt-8 space-y-6 max-w-lg mx-auto">
+        <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 animate-fade-in relative overflow-hidden">
+           <div className="absolute right-0 top-0 w-16 h-16 bg-indigo-50/50 rounded-bl-full"></div>
+           <div className="flex justify-between items-start mb-4">
+             <div className="relative z-10">
+               <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Ação Cível</span>
+               <h2 className="text-lg font-bold text-slate-800 mt-2 leading-tight tracking-tight">{caseData.title}</h2>
+               <p className="text-[10px] text-slate-400 mt-1 font-mono tracking-tighter">PROC. {caseData.processNumber || '00123.45.2024'}</p>
+             </div>
+             <Activity className="w-5 h-5 text-green-500 animate-pulse" />
+           </div>
+           <div className="space-y-2 relative z-10">
+             <div className="flex justify-between text-[11px] font-bold text-slate-500"><span>Evolução Estimada</span><span>60%</span></div>
+             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden shadow-inner"><div className="w-[60%] h-full bg-indigo-500 rounded-full transition-all duration-1000"></div></div>
+           </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-sm"><Clock className="w-4 h-4 text-indigo-600" /> Histórico de Etapas</h3>
+          <div className="space-y-8 relative">
+            <div className="absolute left-[11px] top-2 bottom-4 w-[2px] bg-slate-100"></div>
+            {caseData.timeline && caseData.timeline.map((step) => (
+              <div key={step.id} className="relative z-10 flex gap-4">
+                <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center bg-white transition-all duration-500 ${step.completed ? 'border-green-500 text-green-500 bg-green-50/50' : step.current || step.isCurrent ? 'border-indigo-600 text-indigo-600 ring-4 ring-indigo-50' : 'border-slate-200'}`}>
+                  {step.completed ? <CheckCircle className="w-3 h-3 fill-current" /> : step.current || step.isCurrent ? <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div> : null}
+                </div>
+                <div className={`${step.current || step.isCurrent ? 'opacity-100' : 'opacity-60'}`}>
+                  <h4 className="font-bold text-slate-800 text-sm tracking-tight">{step.title}</h4>
+                  <span className="text-[10px] text-slate-400 font-bold block mb-1">{step.date}</span>
+                  <p className="text-xs text-slate-600 leading-snug bg-slate-50 p-3 rounded-xl mt-2 border border-slate-100/50">{step.description || step.desc}</p>
+                </div>
+              </div>
+            ))}
+            {(!caseData.timeline || caseData.timeline.length === 0) && (
+              <p className="text-xs text-slate-400 font-bold ml-10">Processo iniciado. Aguardando movimentações do tribunal...</p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <button onClick={() => setChatOpen(true)} className="p-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 flex flex-col items-center gap-2 text-xs transition active:scale-95"><MessageSquare className="w-5 h-5" /> Falar com {TENANT_CONFIG.advogado}</button>
+          <button onClick={() => setFinancialOpen(true)} className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold flex flex-col items-center gap-2 text-xs hover:border-indigo-500 transition active:scale-95"><DollarSign className="w-5 h-5 text-green-600" /> Ver Pagamentos</button>
+        </div>
+        <button onClick={() => setUploadOpen(true)} className="w-full p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-3 shadow-sm hover:shadow-md transition active:scale-95"><UploadCloud className="w-5 h-5 text-indigo-500" /> Enviar Arquivo Digital</button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 3. PAINEL DO ADVOGADO
+// ============================================================================
+const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, documents, financials, onUpdateFinancial, onAddFinancial, onAddDocument, globalNotifications, onLogout }) => {
+  const [activeTab, setActiveTab] = useState('kanban');
+  const [notification, setNotification] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  const tenantConfigLocal = JSON.parse(localStorage.getItem('pascale_tenant_config')) || TENANT_CONFIG;
+
+  const activeClients = useMemo(() => {
+    return Array.from(new Set(cases.map(c => typeof c.client === 'object' ? c.client?.name : c.client))).filter(Boolean);
+  }, [cases]);
+
+  const { totalRevenue, openRevenue, lateRevenue } = useMemo(() => {
+    return {
+      totalRevenue: financials.filter(f => f.status === 'Pago').reduce((acc, curr) => acc + curr.amount, 0),
+      openRevenue: financials.filter(f => f.status === 'Aberto').reduce((acc, curr) => acc + curr.amount, 0),
+      lateRevenue: financials.filter(f => f.status === 'Atrasado').reduce((acc, curr) => acc + curr.amount, 0),
+    };
+  }, [financials]);
+
+  const groupedCases = useMemo(() => ({
+    peticao: cases.filter(c => c.stage === 'peticao'),
+    analise_juiz: cases.filter(c => c.stage === 'analise_juiz'),
+    sentenca: cases.filter(c => c.stage === 'sentenca')
+  }), [cases]);
+
+  const [isAddCaseModalOpen, setIsAddCaseModalOpen] = useState(false);
+  const [isAddFinModalOpen, setIsAddFinModalOpen] = useState(false);
+  const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
+
+  const [newCaseData, setNewCaseData] = useState({ client: '', cpf: '', phone: '', title: '' });
+  const [newDocData, setNewDocData] = useState({ name: '', client: '' });
+  const [docFile, setDocFile] = useState(null);
+  
+  const [newFinData, setNewFinData] = useState({ client: '', amount: '', dueDate: '', type: 'Boleto' });
+  const [finChargeType, setFinChargeType] = useState('Honorários Iniciais');
+  const [finTotalInstallments, setFinTotalInstallments] = useState(10);
+  const [finCurrentInstallment, setFinCurrentInstallment] = useState(1);
+  const [finCustomTitle, setFinCustomTitle] = useState('');
+
+  useEffect(() => {
+    if (globalNotifications && globalNotifications.length > 0) {
+      const latest = globalNotifications[globalNotifications.length - 1];
+      setNotification({ title: "Nova Atividade", message: latest, type: "info" });
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [globalNotifications]);
+
+  const handleMove = (id) => {
+    onMoveCase(id);
+    setNotification({ title: "Sucesso", message: "Processo movido. Base de dados atualizada!", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handlePay = (id) => {
+    onUpdateFinancial(id, "Pago");
+    setNotification({ title: "Financeiro", message: "Pagamento registrado com sucesso.", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleAttendWhatsApp = (phone, name) => {
+    const phoneDigits = (phone || "").replace(/\D/g, '');
+    const message = `Olá, ${name}! Aqui é do escritório ${tenantConfigLocal.name}. Tudo bem? Estou entrando em contato sobre o seu processo.`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
+  };
+
+  const handleAttendLead = (lead) => {
+    const phoneDigits = lead.phone.replace(/\D/g, '');
+    const message = `Olá, ${lead.name}! Recebemos o seu contato através do nosso portal jurídico referente à área de ${lead.type}. Como podemos te ajudar hoje?`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/55${phoneDigits}?text=${encodedMessage}`, '_blank');
+    setNotification({ title: "Atendimento Iniciado", message: `Abrindo WhatsApp para ${lead.name}...`, type: "success" });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleAnxietyClick = (clientName) => {
+    setNotification({ 
+      title: "Alerta de Ansiedade - " + clientName, 
+      message: "Este cliente demonstra um nível alto de ansiedade. Priorize o envio de uma atualização.", 
+      type: "warning" 
+    });
+    setTimeout(() => setNotification(null), 7000);
+  };
+
+  // --- SUBMISSÃO DOS FORMULÁRIOS ---
+
+  const handleAddNewCase = (e) => {
+    e.preventDefault();
+    const rawPhone = newCaseData.phone.replace(/\D/g, '');
+    if (rawPhone.length < 10) {
+      setNotification({ title: "Telefone Inválido", message: "Por favor, digite apenas números, incluindo o DDD.", type: "warning" });
+      setTimeout(() => setNotification(null), 4000);
+      return; 
+    }
+    onAddCase(newCaseData);
+    setIsAddCaseModalOpen(false);
+    setNewCaseData({ client: '', cpf: '', phone: '', title: '' });
+    setNotification({ title: "Processo Cadastrado", message: "Enviado para a Nuvem com sucesso.", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleAddNewFin = (e) => {
+    e.preventDefault();
+    if (!newFinData.client) {
+      setNotification({ title: "Atenção", message: "Selecione um cliente da lista.", type: "warning" });
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
+    let finalTitle = finChargeType;
+    if (finChargeType === 'Parcelamento') {
+      finalTitle = `Parcela ${finCurrentInstallment}/${finTotalInstallments}`;
+    } else if (finChargeType === 'Outro') {
+      finalTitle = finCustomTitle;
+    }
+    onAddFinancial({ ...newFinData, title: finalTitle });
+    setIsAddFinModalOpen(false);
+    setNewFinData({ client: '', amount: '', dueDate: '', type: 'Boleto' });
+    setFinChargeType('Honorários Iniciais');
+    setFinCurrentInstallment(1);
+    setFinTotalInstallments(10);
+    setFinCustomTitle('');
+    setNotification({ title: "Fatura Lançada", message: "Gravada no Banco de Dados.", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleAddNewDoc = (e) => {
+    e.preventDefault();
+    if (!newDocData.client || !docFile) {
+      setNotification({ title: "Atenção", message: "Selecione um cliente e anexe o arquivo.", type: "warning" });
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
+    onAddDocument({ name: newDocData.name || docFile.name, client: newDocData.client, file: docFile });
+    setIsAddDocModalOpen(false);
+    setNewDocData({ name: '', client: '' });
+    setDocFile(null);
+    setNotification({ title: "Arquivo Salvo", message: "Processando envio para a nuvem.", type: "success" });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
+      
+      {/* Notificações Flutuantes */}
+      {notification && (
+        <div className={`fixed top-6 right-6 z-[300] px-6 py-4 rounded-xl shadow-2xl flex items-start gap-4 animate-slide-in border 
+            ${notification.type === 'warning' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-slate-900 border-white/10 text-white'}`}>
+          <div className={`${notification.type === 'success' ? 'bg-green-500' : notification.type === 'warning' ? 'bg-red-500' : 'bg-blue-500'} rounded-full p-2 mt-0.5`}>
+            {notification.type === 'success' ? <CheckCircle className="w-4 h-4 text-white" /> : notification.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-white" /> : <Bell className="w-4 h-4 text-white" />}
+          </div>
+          <div className="max-w-xs">
+            <div className={`font-bold text-sm tracking-tight ${notification.type === 'warning' ? 'text-red-800' : 'text-white'}`}>{notification.title}</div>
+            <div className={`text-xs mt-1 leading-relaxed ${notification.type === 'warning' ? 'text-red-700 font-medium' : 'opacity-80'}`}>{notification.message}</div>
+          </div>
+          <button onClick={() => setNotification(null)} className={`ml-2 p-1 rounded hover:bg-black/10 transition ${notification.type === 'warning' ? 'text-red-800' : 'text-white'}`}>
+             <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Modal Novo Processo */}
+      <Modal isOpen={isAddCaseModalOpen} onClose={() => setIsAddCaseModalOpen(false)} title="Cadastrar Novo Processo (Nuvem)">
+        <form onSubmit={handleAddNewCase} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo do Cliente</label>
+            <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: João da Silva" value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPF</label>
+                <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="000.000.000-00" value={newCaseData.cpf} onChange={e => setNewCaseData({...newCaseData, cpf: applyCpfMask(e.target.value)})} />
+            </div>
+            <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+                <input required type="tel" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="(11) 99999-9999" value={newCaseData.phone} onChange={e => setNewCaseData({...newCaseData, phone: applyPhoneMask(e.target.value)})} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assunto / Título da Ação</label>
+            <input required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Usucapião Imóvel X" value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} />
+          </div>
+          <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition">
+            Salvar e Adicionar ao Painel
+          </button>
+        </form>
+      </Modal>
+
+      {/* Modal Nova Fatura */}
+      <Modal isOpen={isAddFinModalOpen} onClose={() => setIsAddFinModalOpen(false)} title="Lançar Nova Fatura (Nuvem)">
+        <form onSubmit={handleAddNewFin} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
+            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.client} onChange={e => setNewFinData({...newFinData, client: e.target.value})}>
+              <option value="">Selecione um cliente ativo...</option>
+              {activeClients.map(clientName => (
+                <option key={clientName} value={clientName}>{clientName}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Cobrança</label>
+            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finChargeType} onChange={e => setFinChargeType(e.target.value)}>
+              <option value="Honorários Iniciais">Honorários Iniciais</option>
+              <option value="Honorários Finais">Honorários Finais</option>
+              <option value="Parcelamento">Parcelamento mensal</option>
+              <option value="Outro">Outra descrição (Livre)</option>
+            </select>
+          </div>
+
+          {finChargeType === 'Parcelamento' && (
+            <div className="flex gap-4 animate-fade-in">
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parcela Atual</label>
+                <input required type="number" min="1" max={finTotalInstallments} className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finCurrentInstallment} onChange={e => setFinCurrentInstallment(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">De (Total)</label>
+                <input required type="number" min="2" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={finTotalInstallments} onChange={e => setFinTotalInstallments(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {finChargeType === 'Outro' && (
+            <div className="animate-fade-in">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição Livre</label>
+              <input required autoFocus className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Ex: Custas Judiciais / Emissão Documentos" value={finCustomTitle} onChange={e => setFinCustomTitle(e.target.value)} />
+            </div>
+          )}
+
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
+              <input required type="number" step="0.01" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="1500.00" value={newFinData.amount} onChange={e => setNewFinData({...newFinData, amount: e.target.value})} />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vencimento</label>
+              <input required type="date" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.dueDate} onChange={e => setNewFinData({...newFinData, dueDate: e.target.value})} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Forma de Pagamento</label>
+            <select className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newFinData.type} onChange={e => setNewFinData({...newFinData, type: e.target.value})}>
+              <option value="Boleto">Boleto</option>
+              <option value="Pix">Pix</option>
+              <option value="Cartão">Cartão</option>
+            </select>
+          </div>
+          <button type="submit" className="w-full py-3 mt-4 bg-green-600 text-white rounded-lg font-bold shadow-lg hover:bg-green-700 transition">
+            Lançar Cobrança
+          </button>
+        </form>
+      </Modal>
+
+      {/* Modal Novo Documento (Cloud Real) */}
+      <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="Upload Seguro para Nuvem">
+        <form onSubmit={handleAddNewDoc} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Cliente</label>
+            <select required className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={newDocData.client} onChange={e => setNewDocData({...newDocData, client: e.target.value})}>
+              <option value="">Selecione um cliente ativo...</option>
+              {activeClients.map(clientName => (
+                <option key={clientName} value={clientName}>{clientName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Arquivo (Opcional)</label>
+            <input className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" placeholder="Se vazio, usa o nome original do PDF" value={newDocData.name} onChange={e => setNewDocData({...newDocData, name: e.target.value})} />
+          </div>
+          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-indigo-400 transition relative">
+             <UploadCloud className="w-8 h-8 mb-2 text-indigo-300" />
+             <p className="text-xs font-bold">{docFile ? docFile.name : "Clique para anexar arquivo"}</p>
+             <input type="file" required className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => setDocFile(e.target.files[0])} />
+          </div>
+          <button type="submit" disabled={!docFile} className="w-full py-3 mt-4 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition disabled:opacity-50">
+            Enviar e Criptografar
+          </button>
+        </form>
+      </Modal>
+
+      {/* Menu Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-[60] md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      <aside className={`fixed md:relative z-[70] h-full w-64 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`} style={{ backgroundColor: tenantConfigLocal.primaryColor }}>
+        <div className="p-6 md:p-8 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg shadow-lg"><Gavel className="w-5 h-5 text-white" /></div>
+            <span className="font-extrabold text-white tracking-tighter text-lg">{tenantConfigLocal.logoText}</span>
+          </div>
+          <button className="md:hidden text-white/50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
+          <button onClick={() => { setActiveTab('kanban'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'kanban' ? 'bg-white/20 shadow-xl translate-x-1' : 'hover:bg-white/10'}`}><Activity className="w-5 h-5" /> <span className="text-sm font-bold">Painel de Gestão</span></button>
+          <button onClick={() => { setActiveTab('leads'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'leads' ? 'bg-white/20 shadow-xl translate-x-1' : 'hover:bg-white/10'}`}><Users className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Novos Leads</span> {leads && leads.length > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white">{leads.length}</span>}</button>
+          <button onClick={() => { setActiveTab('docs'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'docs' ? 'bg-white/20 shadow-xl translate-x-1' : 'hover:bg-white/10'}`}><FileText className="w-5 h-5" /> <span className="text-sm font-bold flex-1 text-left">Documentação</span></button>
+          <button onClick={() => { setActiveTab('finance'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${activeTab === 'finance' ? 'bg-white/20 shadow-xl translate-x-1' : 'hover:bg-white/10'}`}><DollarSign className="w-5 h-5" /> <span className="text-sm font-bold text-left">Controle Financeiro</span></button>
         </nav>
-        <button onClick={onLogout} className="flex items-center gap-3 opacity-50 hover:opacity-100 transition-all font-bold text-xs pt-6 border-t border-white/10 relative z-10"><LogOut className="w-4 h-4" /> Encerrar Sessão</button>
+        <div className="p-6 border-t border-white/10"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold hover:text-white transition opacity-60 hover:bg-red-500/80 hover:opacity-100"><LogOut className="w-4 h-4" /> Sair da Plataforma</button></div>
       </aside>
 
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        <header className="h-24 bg-white/80 backdrop-blur-md border-b border-slate-200/50 flex items-center justify-between px-12 z-40 sticky top-0">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-black text-slate-800 capitalize tracking-tight">{tab}</h1>
-            {isFetching && <Activity className="w-5 h-5 text-indigo-400 animate-spin" />}
+      <main className="flex-1 flex flex-col overflow-hidden w-full">
+        <header className="h-16 md:h-24 bg-white border-b flex items-center justify-between px-6 md:px-10 shadow-sm z-40">
+          <div className="flex items-center gap-3">
+             <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg"><Menu className="w-6 h-6" /></button>
+             <h1 className="font-extrabold text-xl md:text-2xl text-slate-800 tracking-tight capitalize">{activeTab.replace('_', ' ')}</h1>
           </div>
-          <div className="flex items-center gap-6">
-            <button onClick={() => setModals({...modals, [tab === 'finance' ? 'fin' : tab === 'docs' ? 'doc' : 'case']: true})} className="px-6 py-3.5 rounded-2xl text-white font-bold shadow-xl flex items-center gap-2 hover:-translate-y-1 transition-all text-sm" style={{ backgroundColor: tenantConfig.primaryColor }}>
-              <Plus className="w-5 h-5" /> <span>Lançar {tab === 'finance' ? 'Fatura' : tab === 'docs' ? 'Ficheiro' : 'Processo'}</span>
-            </button>
-            <div className="flex items-center gap-4 pl-6 border-l border-slate-200">
-               <div className="text-right hidden md:block">
-                 <div className="text-sm font-black text-slate-800">{tenantConfig.advogado}</div>
-                 <div className="text-[10px] text-green-500 font-bold uppercase tracking-widest mt-0.5 flex items-center justify-end gap-1"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div> Online</div>
-               </div>
-               <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center font-black text-indigo-700 border-2 border-indigo-100 shadow-inner">{tenantConfig.advogado?.substring(0,2).toUpperCase()}</div>
+          <div className="flex items-center gap-4 md:gap-6">
+            
+            {activeTab === 'kanban' && (
+              <button onClick={() => setIsAddCaseModalOpen(true)} className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Processo</span>
+              </button>
+            )}
+            {activeTab === 'finance' && (
+              <button onClick={() => setIsAddFinModalOpen(true)} className="bg-green-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-green-200 hover:bg-green-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nova Fatura</span>
+              </button>
+            )}
+            {activeTab === 'docs' && (
+              <button onClick={() => setIsAddDocModalOpen(true)} className="bg-indigo-600 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95 text-sm">
+                <UploadCloud className="w-4 h-4" /> <span className="hidden sm:inline">Upload Arquivo</span>
+              </button>
+            )}
+
+            <div className="hidden md:flex flex-col text-right border-l pl-6 border-slate-200">
+              <span className="text-sm font-extrabold text-slate-800">{tenantConfigLocal.advogado}</span>
+              <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">Advogado Senior</span>
+            </div>
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg border-2 border-slate-800 shadow-sm">
+              {tenantConfigLocal.advogado.substring(4, 6).toUpperCase()}
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-12 bg-slate-50/50 custom-scrollbar">
-          {tab === 'kanban' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {['peticao', 'analise_juiz', 'sentenca'].map(s => (
-                <div key={s} className="bg-slate-200/30 rounded-[3rem] p-8 min-h-[650px] space-y-6 border border-slate-200/50 flex flex-col">
-                  <div className="flex justify-between font-black text-[11px] text-slate-400 uppercase tracking-[0.2em] px-2 items-center">
-                    <span>{s.replace('_', ' ')}</span>
-                    <span className="bg-white px-3 py-1 rounded-full text-slate-800 shadow-sm border border-slate-100">{data.cases.filter(c => c.stage === s).length}</span>
-                  </div>
-                  {data.cases.filter(c => c.stage === s).map(c => (
-                    <div key={c.id} className="bg-white p-8 rounded-[2rem] shadow-sm border-l-[8px] transition-all hover:shadow-xl hover:-translate-y-1.5 group flex flex-col gap-3" style={{ borderLeftColor: c.anxietyScore > 70 ? '#ef4444' : tenantConfig.primaryColor }}>
-                        <div className="flex justify-between items-start">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-lg">{c.status}</span>
-                          {c.anxietyScore > 70 && <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />}
-                        </div>
-                        <h3 className="font-black text-slate-800 text-lg leading-tight">{c.client?.name || c.client}</h3>
-                        <p className="text-xs text-slate-500 font-medium mt-1 line-clamp-2">{c.title}</p>
-                        
-                        <div className="mt-1"><TJSPLink processNumber={c.processNumber} /></div>
-
-                        {c.timeline && c.timeline.length > 0 && (
-                          <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                            <div className="flex items-center gap-1.5 mb-3">
-                              <Clock className="w-3 h-3 text-slate-400" />
-                              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Últimas 3 Movimentações</span>
-                            </div>
-                            <div className="space-y-3">
-                              {[...c.timeline].reverse().slice(0, 3).map((step, idx) => (
-                                <div key={step.id || idx} className="flex gap-3 items-start">
-                                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${step.completed ? 'bg-green-500' : 'bg-indigo-500 animate-pulse'}`}></div>
-                                  <div>
-                                    <p className="text-[10px] font-extrabold text-slate-700 leading-tight">{step.title}</p>
-                                    {step.description && <p className="text-[9px] text-slate-500 mt-1 line-clamp-1 leading-snug font-medium">{step.description}</p>}
-                                    <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase tracking-wider">{step.date}</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
-                           <button onClick={() => window.open(`https://wa.me/55${(c.client?.phone || '11999999999').replace(/\D/g,'')}`, '_blank')} className="text-green-600 bg-green-50 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-100 transition">WA</button>
-                           {s !== 'sentenca' && <button onClick={() => wrapAction(() => onMove(c.id, s), '', 'Processo avançado!')} className="bg-slate-50 text-indigo-700 px-4 py-2 rounded-xl font-black text-[10px] hover:bg-indigo-50 hover:text-indigo-800 transition shadow-sm border border-slate-200 uppercase tracking-widest">Avançar ➔</button>}
-                        </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === 'leads' && (
-            <div className="bg-white rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden">
-               <table className="w-full text-left">
-                  <thead className="bg-slate-50/80 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b">
-                    <tr><th className="p-8">Nome do Lead</th><th className="p-8">Contacto</th><th className="p-8">Área</th><th className="p-8 text-right">Ação</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {data.leads.map(l => (
-                      <tr key={l.id} className="hover:bg-slate-50/50 transition">
-                        <td className="p-8 font-extrabold text-slate-800">{l.name}</td>
-                        <td className="p-8 text-slate-600 text-sm font-bold">{l.phone}</td>
-                        <td className="p-8"><span className="bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase">{l.type}</span></td>
-                        <td className="p-8 text-right"><button onClick={() => window.open(`https://wa.me/55${l.phone.replace(/\D/g,'')}`, '_blank')} className="bg-green-500 text-white p-3 rounded-2xl shadow-lg hover:scale-110 transition-all"><MessageSquare className="w-5 h-5" /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-               </table>
-            </div>
-          )}
-
-          {tab === 'docs' && (
-            <div className="bg-white rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden">
-               <table className="w-full text-left">
-                  <thead className="bg-slate-50/80 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b">
-                    <tr><th className="p-8">Ficheiro Digital</th><th className="p-8">Titular</th><th className="p-8">Tamanho</th><th className="p-8 text-right">Ação</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {data.docs.map(d => (
-                      <tr key={d.id} className="hover:bg-slate-50/50 transition">
-                        <td className="p-8 font-extrabold text-slate-800 flex items-center gap-4"><div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-400"><File className="w-5 h-5" /></div> {d.name}</td>
-                        <td className="p-8 text-slate-500 text-sm font-bold">{d.client}</td>
-                        <td className="p-8 text-slate-400 text-[10px] font-black uppercase tracking-widest">{d.size}</td>
-                        <td className="p-8 text-right">
-                          <button onClick={() => d.url ? window.open(d.url, '_blank') : showToast('A processar na nuvem...', 'error')} className="font-black text-[11px] flex items-center gap-2 ml-auto hover:bg-slate-50 px-5 py-2.5 rounded-xl transition-all uppercase tracking-tight" style={{ color: tenantConfig.primaryColor }}>
-                            <Download className="w-4 h-4" /> Download
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-               </table>
-            </div>
-          )}
-
-          {tab === 'finance' && (
-            <div className="space-y-10 animate-fade-in">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 flex justify-between items-center relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 w-40 h-40 bg-green-50 rounded-bl-full transition-transform duration-700 group-hover:scale-125"></div>
-                    <div className="relative z-10">
-                      <div className="text-[11px] font-black text-slate-400 uppercase mb-3 tracking-[0.2em]">Faturado Realizado</div>
-                      <div className="text-5xl font-black text-slate-800 tracking-tighter">{formatCurrency(data.fins.filter(f => f.status === 'Pago').reduce((a,c)=>a+c.amount,0))}</div>
-                    </div>
-                    <TrendingUp className="w-16 h-16 text-green-500 relative z-10 opacity-80" />
-                  </div>
-                  <div className="p-12 rounded-[3rem] shadow-2xl flex justify-between items-center text-white relative overflow-hidden group" style={{ backgroundColor: tenantConfig.primaryColor }}>
-                    <div className="absolute right-0 top-0 w-40 h-40 bg-white/5 rounded-bl-full transition-transform duration-700 group-hover:scale-125"></div>
-                    <div className="relative z-10">
-                      <div className="text-[11px] font-black text-white/60 uppercase mb-3 tracking-[0.2em]">Previsão em Aberto</div>
-                      <div className="text-5xl font-black tracking-tighter">{formatCurrency(data.fins.filter(f => f.status !== 'Pago').reduce((a,c)=>a+c.amount,0))}</div>
-                    </div>
-                    <div className="p-5 bg-white/10 rounded-[2rem] backdrop-blur-sm relative z-10 border border-white/20"><DollarSign className="w-10 h-10" /></div>
-                  </div>
+        <div className="flex-1 overflow-auto p-4 md:p-10 bg-slate-50/50 pb-24 md:pb-10">
+          {activeTab === 'finance' ? (
+            <div className="animate-fade-in space-y-6 md:space-y-10">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Receita Total Líquida</div><div className="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">{formatCurrency(totalRevenue)}</div><div className="mt-4 flex items-center gap-1 text-green-500 text-[10px] font-bold"><TrendingUp className="w-3 h-3" /> +12% vs mês anterior</div></div>
+                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Honorários em Aberto</div><div className="text-3xl md:text-4xl font-extrabold text-orange-500 tracking-tight">{formatCurrency(openRevenue)}</div></div>
+                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition duration-500"><div className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em] mb-3">Crédito de Risco</div><div className="text-3xl md:text-4xl font-extrabold text-red-600 tracking-tight">{formatCurrency(lateRevenue)}</div></div>
                </div>
-               <div className="bg-white rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden">
-                    <table className="w-full text-left">
-                       <thead className="bg-slate-50/80 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b">
-                          <tr><th className="p-8">Descrição</th><th className="p-8">Valor</th><th className="p-8">Vencimento</th><th className="p-8">Status</th></tr>
-                       </thead>
-                       <tbody className="divide-y divide-slate-50">
-                          {data.fins.map(f => (
-                             <tr key={f.id} className="hover:bg-slate-50/50 transition">
-                                <td className="p-8"><div className="font-extrabold text-slate-800 text-sm mb-1">{f.title}</div><div className="text-[11px] font-bold text-slate-400 uppercase">{f.client?.name || f.client}</div></td>
-                                <td className="p-8 font-black text-slate-800 text-lg">{formatCurrency(f.amount)}</td>
-                                <td className="p-8 text-slate-500 text-sm font-bold">{formatDate(f.dueDate)}</td>
-                                <td className="p-8"><span className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${f.status === 'Pago' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{f.status}</span></td>
-                             </tr>
-                          ))}
-                       </tbody>
-                    </table>
-                 </div>
+               <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
+                   <table className="w-full text-left text-sm min-w-[600px]">
+                     <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
+                       <tr><th className="p-4 md:p-8">Descrição da Fatura</th><th className="p-4 md:p-8">Cliente</th><th className="p-4 md:p-8">Vencimento</th><th className="p-4 md:p-8">Montante</th><th className="p-4 md:p-8">Estado</th><th className="p-4 md:p-8 text-right">Ações</th></tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                       {financials && financials.map(fin => (
+                         <tr key={fin.id} className="hover:bg-slate-50/50 transition duration-300">
+                           <td className="p-4 md:p-8 font-bold text-slate-800">{fin.title}</td>
+                           <td className="p-4 md:p-8 text-slate-600 font-medium">{fin.client}</td>
+                           <td className="p-4 md:p-8 text-slate-500 font-medium">{formatDate(fin.dueDate)}</td>
+                           <td className="p-4 md:p-8 font-extrabold text-slate-800">{formatCurrency(fin.amount)}</td>
+                           <td className="p-4 md:p-8"><span className={`px-3 md:px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase tracking-tight ${fin.status === 'Pago' ? 'bg-green-100 text-green-700' : fin.status === 'Atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{fin.status}</span></td>
+                           <td className="p-4 md:p-8 text-right">{fin.status !== 'Pago' && <button onClick={() => handlePay(fin.id)} className="bg-white text-green-600 font-extrabold hover:bg-green-600 hover:text-white px-3 md:px-5 py-2 rounded-xl border-2 border-green-500/20 text-[10px] transition-all duration-300 shadow-sm hover:shadow-green-500/20">Liquidar</button>}</td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                </div>
+            </div>
+          ) : activeTab === 'leads' ? (
+            <div className="animate-fade-in bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
+                 <table className="w-full text-left text-sm min-w-[600px]">
+                   <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
+                     <tr><th className="p-4 md:p-8">Interessado</th><th className="p-4 md:p-8">Contato</th><th className="p-4 md:p-8">Área</th><th className="p-4 md:p-8">Status</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100">
+                     {leads && leads.map(lead => (
+                       <tr key={lead.id} className="hover:bg-slate-50/50 transition duration-300">
+                         <td className="p-4 md:p-8 font-bold text-slate-800">{lead.name}</td>
+                         <td className="p-4 md:p-8 text-slate-600 font-medium">{lead.phone}</td>
+                         <td className="p-4 md:p-8"><span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-tighter">{lead.type}</span></td>
+                         <td className="p-4 md:p-8"><span className={`px-4 py-1.5 rounded-full text-[9px] font-extrabold uppercase ${lead.status === 'Novo' ? 'bg-green-100 text-green-700 animate-pulse' : 'bg-slate-100 text-slate-500'}`}>{lead.status}</span></td>
+                         <td className="p-4 md:p-8 text-right">
+                           <button 
+                             onClick={() => handleAttendLead(lead)} 
+                             className={`${lead.status === 'Novo' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/10' : 'bg-green-500 hover:bg-green-600 shadow-green-900/10'} text-white font-extrabold px-4 md:px-5 py-2.5 rounded-xl text-[10px] transition shadow-lg flex items-center gap-2 ml-auto`}
+                           >
+                             <MessageSquare className="w-3 h-3" />
+                             {lead.status === 'Novo' ? 'Atender' : 'WhatsApp'}
+                           </button>
+                         </td>
+                       </tr>
+                     ))}
+                     {(!leads || leads.length === 0) && <tr><td colSpan="5" className="p-8 text-center text-slate-400 font-bold">Nenhum lead capturado.</td></tr>}
+                   </tbody>
+                 </table>
+            </div>
+          ) : activeTab === 'docs' ? (
+            <div className="animate-fade-in bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[600px]">
+                   <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest border-b">
+                     <tr><th className="p-4 md:p-8">Arquivo Digital</th><th className="p-4 md:p-8">Remetente</th><th className="p-4 md:p-8">Tamanho</th><th className="p-4 md:p-8 text-right">Ação</th></tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100">
+                     {documents && documents.map(doc => (
+                       <tr key={doc.id} className="hover:bg-slate-50/50 transition duration-300">
+                         <td className="p-4 md:p-8 font-bold text-slate-800 flex items-center gap-3 md:gap-4"><div className="p-2 bg-indigo-50 rounded-lg"><File className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" /></div> {doc.name}</td>
+                         <td className="p-4 md:p-8 text-slate-600 font-medium">{doc.client}</td>
+                         <td className="p-4 md:p-8 text-slate-400 text-[10px] font-extrabold uppercase tracking-tighter">{doc.size}</td>
+                         <td className="p-4 md:p-8 text-right">
+                           <button onClick={() => doc.url ? window.open(doc.url, '_blank') : alert('Erro: Link não disponível ou arquivo não sincronizado.')} className="text-indigo-600 font-extrabold hover:bg-indigo-50 px-3 md:px-5 py-2.5 rounded-xl text-[10px] transition-all border-2 border-transparent hover:border-indigo-100 flex items-center gap-2 ml-auto shadow-sm">
+                             <Download className="w-4 h-4" /> <span className="hidden sm:inline">Descarregar</span>
+                           </button>
+                         </td>
+                       </tr>
+                     ))}
+                     {(!documents || documents.length === 0) && <tr><td colSpan="4" className="p-8 text-center text-slate-400 font-bold">Nenhum documento salvo.</td></tr>}
+                   </tbody>
+                </table>
+            </div>
+          ) : (
+            <div className="animate-fade-in space-y-8 md:space-y-12">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+                
+                {/* O Bloco de Processos em Carteira */}
+                <div onClick={() => setNotification({ title: "Processos Ativos", message: `Você tem ${cases.length} processos sendo geridos no momento.`, type: "info" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
+                  <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-indigo-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
+                  <div className="text-[9px] md:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Processos em Carteira</div>
+                  <div className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tighter">{cases.length}</div>
+                </div>
+                
+                {/* O Bloco de Estatística de Ansiedade */}
+                <div onClick={() => setNotification({ title: "Alerta de Ansiedade", message: `Existem ${cases.filter(c => c.anxietyScore > 70).length} clientes que precisam de atenção. Role para baixo e veja os alertas vermelhos.`, type: "warning" })} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
+                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-red-50 rounded-bl-full group-hover:scale-125 transition duration-700 opacity-60 origin-top-right"></div>
+                   <div className="text-[9px] md:text-[10px] text-red-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
+                     Índice de Ansiedade <AlertTriangle className="w-3 h-3" />
+                   </div>
+                   <div className="text-3xl md:text-5xl font-extrabold text-red-600 tracking-tighter">{cases.filter(c => c.anxietyScore > 70).length}</div>
+                </div>
+                
+                {/* O Bloco de Conversões Pendentes */}
+                <div onClick={() => setActiveTab('leads')} className="cursor-pointer bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-500">
+                   <div className="absolute right-0 top-0 w-16 h-16 md:w-24 md:h-24 bg-green-50 rounded-bl-full group-hover:scale-125 transition duration-700 origin-top-right"></div>
+                   <div className="text-[9px] md:text-[10px] text-green-500 font-extrabold uppercase tracking-widest mb-2 md:mb-4 flex items-center gap-1">
+                     Conversões Pendentes <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                   </div>
+                   <div className="text-3xl md:text-5xl font-extrabold text-green-600 tracking-tighter">{leads && leads.filter(l => l.status === 'Novo').length}</div>
+                </div>
+
+                {/* O Bloco de Eficiência */}
+                <div onClick={() => setNotification({ title: "Eficiência do Escritório", message: "O sistema gerou 8.4 mil ações automáticas neste mês, poupando tempo valioso da sua equipe.", type: "success" })} className="cursor-pointer bg-indigo-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl relative group overflow-hidden hover:scale-[1.03] transition duration-500">
+                   <div className="text-[9px] md:text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest mb-2 md:mb-4">Eficiência</div>
+                   <div className="text-3xl md:text-5xl font-extrabold text-white tracking-tighter">8.4k</div>
+                   <p className="text-[8px] md:text-[9px] text-indigo-400 mt-2 md:mt-3 font-extrabold uppercase tracking-wider">Avisos Proativos</p>
+                </div>
+
+              </div>
+
+              {/* KANBAN BOARD */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
+                {[
+                  { id: 'peticao', title: 'Fase Inicial (Petição)', color: 'border-slate-300', items: groupedCases.peticao },
+                  { id: 'analise_juiz', title: 'Em Andamento (Juiz)', color: 'border-indigo-400', items: groupedCases.analise_juiz },
+                  { id: 'sentenca', title: 'Concluído (Sentença)', color: 'border-green-400', items: groupedCases.sentenca }
+                ].map(col => (
+                  <div key={col.id} className="bg-slate-200/40 rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-8 border border-slate-200/50 min-h-[400px] md:min-h-[550px] flex flex-col gap-4 md:gap-6 backdrop-blur-sm">
+                    <div className="flex justify-between items-center px-2 md:px-4 mb-2">
+                       <span className="font-extrabold text-slate-500 text-[10px] md:text-[11px] uppercase tracking-[0.1em] flex items-center gap-2">
+                         <div className={`w-2 h-2 rounded-full border-2 ${col.color} bg-white`}></div>
+                         {col.title}
+                       </span>
+                       <span className="bg-white text-slate-800 font-extrabold text-[10px] px-3 py-1 rounded-full shadow-sm border border-slate-200">{col.items.length}</span>
+                    </div>
+                    {col.items.map(c => (
+                      <div key={c.id} className={`bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-[6px] transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 md:hover:-translate-y-2 group relative overflow-hidden ${c.anxietyScore > 70 ? 'border-l-red-500' : 'border-l-indigo-600'}`}>
+                         <div className="flex justify-between items-start mb-4">
+                           <span className="text-[8px] md:text-[9px] font-extrabold uppercase bg-slate-50 text-slate-500 px-3 py-1 rounded-full tracking-tighter">{c.status}</span>
+                           
+                           {/* BOTÃO DO RADAR DE ANSIEDADE - Funciona no telemóvel! */}
+                           {c.anxietyScore > 70 && (
+                             <button 
+                               onClick={() => handleAnxietyClick(c.client)}
+                               className="bg-red-50 p-1.5 rounded-full hover:bg-red-100 transition shadow-sm border border-red-100"
+                               title="Clique para ver detalhes do alerta"
+                             >
+                               <AlertTriangle className="w-4 h-4 md:w-5 md:h-5 text-red-500 animate-pulse" />
+                             </button>
+                           )}
+                         </div>
+                         
+                         <h3 className="font-extrabold text-slate-800 text-base md:text-lg mb-1 leading-tight tracking-tight group-hover:text-indigo-600 transition">{c.client}</h3>
+                         <p className="text-[10px] md:text-[11px] text-slate-400 font-semibold mb-5 md:mb-6 truncate">{c.title}</p>
+                         <div className="flex justify-between items-center pt-4 md:pt-5 border-t border-slate-50 gap-2">
+                            {/* Botão de WhatsApp */}
+                            <button 
+                              onClick={() => handleAttendWhatsApp(c.phone || "11999999999", c.client)}
+                              className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold text-green-600 bg-green-50 px-3 py-2 rounded-lg hover:bg-green-100 transition whitespace-nowrap"
+                            >
+                              <MessageSquare className="w-3 h-3" /> WhatsApp
+                            </button>
+
+                            {/* Botão Avançar Fase */}
+                            {col.id !== 'sentenca' && (
+                              <button onClick={() => handleMove(c.id)} className="text-[9px] md:text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 md:px-4 py-2 rounded-xl opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 transform md:translate-x-4 md:group-hover:translate-x-0 shadow-sm hover:bg-indigo-100">Avançar ➔</button>
+                            )}
+                         </div>
+                      </div>
+                    ))}
+                    {col.items.length === 0 && (
+                      <div className="h-24 border-2 border-dashed border-slate-300/50 rounded-2xl flex items-center justify-center text-slate-400 text-xs font-bold">
+                        Nenhum processo nesta fase
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </main>
-
-      {/* MODALS DA DASHBOARD */}
-      <Modal isOpen={modals.case} onClose={()=>setModals({...modals, case:false})} title="Registar Processo Cloud">
-        <form onSubmit={(e) => { e.preventDefault(); wrapAction(async () => onAddCase(fCase), 'case', 'Processo gravado com sucesso!'); }} className="space-y-5">
-          <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium focus:border-indigo-500 outline-none" placeholder="Nome Completo do Cliente" value={fCase.client} onChange={e=>setFCase({...fCase, client: e.target.value})} />
-          <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium focus:border-indigo-500 outline-none" placeholder="Número do Processo (TJSP)" value={fCase.processNumber} onChange={e=>setFCase({...fCase, processNumber: applyProcessMask(e.target.value)})} />
-          <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium focus:border-indigo-500 outline-none" placeholder="Objeto da Ação" value={fCase.title} onChange={e=>setFCase({...fCase, title: e.target.value})} />
-          <div className="flex gap-4">
-             <input className="flex-1 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium focus:border-indigo-500 outline-none" placeholder="WhatsApp" value={fCase.phone} onChange={e=>setFCase({...fCase, phone: applyPhoneMask(e.target.value)})} />
-             <input type="number" className="flex-1 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium focus:border-indigo-500 outline-none" placeholder="Valor (€)" onChange={e=>setFCase({...fCase, value: e.target.value})} />
-          </div>
-          <button disabled={actionLoading} className="w-full py-4 text-white rounded-2xl font-black shadow-xl uppercase tracking-wide text-sm flex justify-center items-center" style={{backgroundColor: tenantConfig.primaryColor}}>
-            {actionLoading ? <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin"></div> : "Iniciar Acompanhamento Digital"}
-          </button>
-        </form>
-      </Modal>
-
-      <Modal isOpen={modals.fin} onClose={()=>setModals({...modals, fin:false})} title="Lançar Honorários">
-        <form onSubmit={(e) => { e.preventDefault(); wrapAction(async () => onAddFin(fFin), 'fin', 'Fatura lançada com sucesso!'); }} className="space-y-5">
-          <select required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium outline-none" value={fFin.client} onChange={e=>setFFin({...fFin, client: e.target.value})}>
-            <option value="">A quem se destina?</option>
-            {activeClients.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <input required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium outline-none" placeholder="Descrição da Cobrança" value={fFin.title} onChange={e=>setFFin({...fFin, title: e.target.value})} />
-          <div className="flex gap-4">
-            <input required type="number" step="0.01" className="flex-1 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium" placeholder="Valor (€)" value={fFin.amount} onChange={e=>setFFin({...fFin, amount: e.target.value})} />
-            <input required type="date" className="flex-1 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium" value={fFin.dueDate} onChange={e=>setFFin({...fFin, dueDate: e.target.value})} />
-          </div>
-          <button className="w-full py-4 text-white rounded-2xl font-black shadow-xl bg-green-600 uppercase tracking-wide text-sm">Emitir Cobrança</button>
-        </form>
-      </Modal>
-
-      <Modal isOpen={modals.doc} onClose={()=>setModals({...modals, doc:false})} title="Arquivo Criptografado (Supabase)">
-        <form onSubmit={(e) => { e.preventDefault(); if(!file || !docClient) return; const fd = new FormData(); fd.append('file', file); fd.append('client', docClient); fd.append('name', file.name); wrapAction(async () => onAddDoc(fd), 'doc', 'Documento guardado na nuvem!'); }} className="space-y-6">
-          <select required className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-medium" value={docClient} onChange={e=>setDocClient(e.target.value)}>
-            <option value="">Pertence a que cliente?</option>
-            {activeClients.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <div className="border-4 border-dashed border-slate-200 rounded-[2.5rem] p-12 flex flex-col items-center justify-center bg-slate-50 hover:bg-white transition-all group relative cursor-pointer">
-             <div className="w-20 h-20 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><UploadCloud className="w-10 h-10 text-slate-300 group-hover:text-indigo-500" /></div>
-             <p className="text-sm font-extrabold text-slate-600 text-center">{file ? file.name : "Clique para anexar um PDF"}</p>
-             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e=>setFile(e.target.files[0])} />
-          </div>
-          <button disabled={actionLoading || !file} className="w-full py-4 text-white rounded-2xl font-black shadow-xl uppercase tracking-wide text-sm flex justify-center items-center" style={{backgroundColor: tenantConfig.primaryColor, opacity: (!file || actionLoading) ? 0.5 : 1}}>
-            Transferir para Nuvem
-          </button>
-        </form>
-      </Modal>
     </div>
   );
 };
@@ -558,79 +1034,241 @@ const LawyerDashboard = ({ data, onMove, onAddCase, onAddFin, onAddDoc, onLogout
 // --- APP CONTROLLER PRINCIPAL ---
 // ============================================================================
 export default function App() {
-  const [view, setView] = useState('landing');
-  const [tenant, setTenant] = useStickyState({ primaryColor: "#1e293b", logoText: "PASCALE JURIS", advogado: "Administrador" }, 'pascale_tenant_config');
-  const [data, setData] = useState({ cases: [], leads: [], docs: [], fins: [] });
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+  const [currentView, setCurrentView] = useState('login'); 
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+  
+  // TODOS OS DADOS AGORA VÊM DA NUVEM (SEM LOCAL STORAGE)
+  const [cases, setCases] = useState([]);
+  const [financials, setFinancials] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [messages, setMessages] = useStickyState(DEFAULT_MESSAGES, 'pascale_messages'); // Mantido local para demo do Chat do Cliente
+  const [globalNotifications, setGlobalNotifications] = useState([]);
 
-  const showToast = useCallback((message, type = 'success') => setToast({ visible: true, message, type }), []);
-
-  const fetchAll = useCallback(async () => {
+  // Função Auxiliar de Fetch com Injeção de Token JWT
+  const authFetch = async (endpoint, options = {}) => {
     const token = localStorage.getItem('pascale_token');
-    if (!token) return view === 'dashboard' ? setView('login') : null;
-    
-    setLoading(true);
-    try {
-      const h = { 'Authorization': `Bearer ${token}` };
-      const fetchApi = async (p) => {
-        const r = await fetch(`${API_URL}/${p}`, { headers: h });
-        const json = await r.json();
-        return json.success ? json.data : [];
-      };
-      const [c, l, d, f] = await Promise.all([fetchApi('cases'), fetchApi('leads'), fetchApi('documents'), fetchApi('financials')]);
-      setData({ cases: c, leads: l, docs: d, fins: f });
-    } catch(e) { localStorage.removeItem('pascale_token'); setView('login'); }
-    finally { setLoading(false); }
-  }, [view]);
-
-  useEffect(() => { if (localStorage.getItem('pascale_token') && view === 'dashboard') fetchAll(); }, [fetchAll, view]);
-
-  const apiCall = async (p, m, b, isFd = false) => {
-    const token = localStorage.getItem('pascale_token');
-    const h = { 'Authorization': `Bearer ${token}` };
-    if (!isFd) h['Content-Type'] = 'application/json';
-    try {
-      const r = await fetch(`${API_URL}/${p}`, { method:m, headers:h, body: isFd ? b : JSON.stringify(b) });
-      const json = await r.json();
-      if (json.success) { fetchAll(); return true; } return false;
-    } catch (e) { return false; }
+    const headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+    const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+    if (response.status === 401 || response.status === 403) throw new Error('Autenticação expirada');
+    return response;
   };
 
-  const renderView = () => {
-    // --- REDE DE SEGURANÇA: Previne o erro do menu invisível (cache antigo) ---
-    const safeTenant = {
-      ...tenant,
-      primaryColor: (tenant?.primaryColor && tenant.primaryColor.startsWith('#')) ? tenant.primaryColor : '#1e293b',
-      advogado: tenant?.advogado || tenant?.name || 'Administrador'
-    };
+  // 📡 1. BUSCAR DADOS (100% NUVEM)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [casesRes, finRes, leadsRes, docsRes] = await Promise.all([
+          authFetch('/cases'),
+          authFetch('/financials'),
+          authFetch('/leads'),
+          authFetch('/documents')
+        ]);
 
-    switch(view) {
-      case 'landing': return <LandingPage onNavigate={setView} tenantConfig={safeTenant} onAddLead={(d)=>apiCall('leads','POST',d)} showToast={showToast} />;
-      case 'login': return <LoginPage onLogin={(l)=>{setTenant(l); setView('dashboard');}} tenantConfig={safeTenant} showToast={showToast} />;
-      case 'portal': return <ClientPortal onNavigate={setView} caseData={data.cases[0] || null} tenantConfig={safeTenant} showToast={showToast} />;
-      case 'dashboard': return <LawyerDashboard data={data} isFetching={loading} showToast={showToast} tenantConfig={safeTenant} onMove={(id, s)=>apiCall(`cases/${id}/move`,'PATCH',{stage: s === 'peticao' ? 'analise_juiz' : 'sentenca'})} onAddCase={(d)=>apiCall('cases','POST',d)} onAddFin={(d)=>apiCall('financials','POST',d)} onAddDoc={(fd)=>apiCall('documents','POST',fd,true)} onLogout={()=>{localStorage.removeItem('pascale_token'); setView('landing');}} />;
-      default: return <LandingPage onNavigate={setView} tenantConfig={safeTenant} onAddLead={()=>{}} showToast={showToast} />;
+        if (casesRes.ok) {
+          const casesData = await casesRes.json();
+          setCases(casesData.data.map(dbCase => ({
+            ...dbCase,
+            client: dbCase.client?.name || 'Desconhecido',
+            phone: dbCase.client?.phone || '',
+            lastUpdate: "Sincronizado",
+            timeline: dbCase.timeline || []
+          })));
+        }
+
+        if (finRes.ok) {
+          const finData = await finRes.json();
+          setFinancials(finData.data.map(dbFin => ({
+             ...dbFin,
+             client: dbFin.client?.name || 'Desconhecido'
+          })));
+        }
+
+        if (leadsRes.ok) {
+          const leadsData = await leadsRes.json();
+          // Formatação simplificada de data
+          setLeads(leadsData.data.map(l => ({...l, date: new Date(l.createdAt).toLocaleDateString('pt-BR')})));
+        }
+
+        if (docsRes.ok) {
+          const docsData = await docsRes.json();
+          setDocuments(docsData.data);
+        }
+
+      } catch (error) {
+        console.warn("Sessão expirada ou erro de nuvem. Redirecionando.");
+        setIsAuthenticated(false);
+        setCurrentView('login');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    
+    if(isAuthenticated) {
+      fetchData();
+    }
+  }, [isAuthenticated]);
+
+  // 📡 2. GRAVAR DADOS E MOVER FASE (NUVEM)
+  const moveCase = async (caseId) => {
+    setCases(prev => prev.map(c => {
+      if (c.id === caseId) {
+        const newStage = c.stage === 'peticao' ? 'analise_juiz' : 'sentenca';
+        return { ...c, stage: newStage, status: newStage === 'sentenca' ? 'Concluído' : 'Em Andamento', lastUpdate: 'Agora mesmo' };
+      }
+      return c;
+    }));
+    
+    try {
+      await authFetch(`/cases/${caseId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: 'sentenca', status: 'Concluído' })
+      });
+    } catch (e) {
+      console.error("Erro ao gravar mudança:", e);
     }
   };
 
+  // ➕ 3. NOVO PROCESSO
+  const addCase = async (newCaseData) => {
+    try {
+      const response = await authFetch(`/cases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCaseData)
+      });
+      const dbCase = await response.json();
+      if(dbCase.success) {
+        setCases(prev => [{
+          ...dbCase.data,
+          client: dbCase.data.client?.name || newCaseData.client,
+          phone: dbCase.data.client?.phone || newCaseData.phone,
+          lastUpdate: "Sincronizado",
+          timeline: dbCase.data.timeline || []
+        }, ...prev]);
+      }
+    } catch (e) {
+      console.error("Erro ao enviar novo processo para API:", e);
+    }
+  };
+
+  // ➕ 4. NOVA FATURA
+  const handleAddFinancial = async (finData) => {
+    try {
+      const response = await authFetch(`/financials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finData)
+      });
+      const dbFin = await response.json();
+      if(dbFin.success) setFinancials(prev => [dbFin.data, ...prev]);
+    } catch (e) {
+      console.error("Erro ao enviar fatura para API:", e);
+    }
+  };
+
+  // ➕ 5. NOVO DOCUMENTO (UPLOAD REAL SUPABASE)
+  const handleUploadDocument = async (docData) => {
+    const formData = new FormData();
+    formData.append('file', docData.file);
+    formData.append('client', docData.client);
+    formData.append('name', docData.name);
+
+    try {
+      const response = await authFetch(`/documents`, {
+        method: 'POST',
+        body: formData // FormData não leva 'Content-Type' no fetch
+      });
+      const dbDoc = await response.json();
+      if(dbDoc.success) setDocuments(prev => [dbDoc.data, ...prev]);
+    } catch (e) {
+      console.error("Erro no upload:", e);
+    }
+  };
+
+  // ➕ 6. NOVO LEAD (PÚBLICO - Sem Auth)
+  const addLead = async (newLead) => {
+    try {
+      await fetch(`${API_URL}/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newLead.name, phone: newLead.phone, type: newLead.type })
+      });
+    } catch (e) { console.error("Erro ao enviar Lead", e); }
+  };
+
+  // Atualizações simples
+  const updateFinancial = async (id, newStatus) => {
+    setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
+    try { await authFetch(`/financials/${id}/pay`, { method: 'PATCH' }); } catch (e) {}
+  };
+  
+  const updateLeadStatus = (id, newStatus) => setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+  const handleSendMessage = (text, sender) => setMessages(prev => [...prev, { id: Date.now(), text, sender, time: 'Agora' }]);
+  const notifyLawyer = (message) => setGlobalNotifications(prev => [...prev, message]);
+
+  // ROTAS INTERNAS
+  const renderView = () => {
+    switch(currentView) {
+      case 'landing': return <LandingPage onNavigate={setCurrentView} onAddLead={addLead} />;
+      case 'portal': return <ClientPortal onNavigate={setCurrentView} caseData={cases[0]} onNotifyLawyer={notifyLawyer} messages={messages} onSendMessage={handleSendMessage} onUploadDocument={handleUploadDocument} financials={financials} />;
+      case 'login': return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
+      case 'dashboard': 
+        if (!isAuthenticated) return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
+        return <LawyerDashboard 
+          onNavigate={setCurrentView} 
+          cases={cases} 
+          onMoveCase={moveCase} 
+          onAddCase={addCase} 
+          leads={leads} 
+          documents={documents} 
+          financials={financials} 
+          onUpdateFinancial={updateFinancial} 
+          onAddFinancial={handleAddFinancial}
+          onAddDocument={handleUploadDocument}
+          globalNotifications={globalNotifications} 
+          onLogout={() => { 
+            localStorage.removeItem('pascale_token');
+            setIsAuthenticated(false); 
+            setCurrentView('login'); 
+          }} 
+          onUpdateLead={updateLeadStatus} 
+        />;
+      default: return <LoginPage onLogin={() => { setIsAuthenticated(true); setCurrentView('dashboard'); }} />;
+    }
+  };
+
+  // TELA DE CARREGAMENTO DO BANCO DE DADOS
+  if (loadingData && isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
+        <Activity className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
+        <p className="font-extrabold tracking-widest uppercase text-xs animate-pulse text-indigo-200">Sincronizando Banco de Dados...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900 bg-slate-50 relative">
+    <div className="antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900 pb-20 md:pb-0">
       <style>{`
-        @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .animate-slide-up { animation: slide-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .animate-slide-in { animation: slide-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
       `}</style>
       
-      {toast.visible && <Toast message={toast.message} type={toast.type} onClose={() => setToast(t => ({...t, visible: false}))} />}
-
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-[300] bg-slate-900/90 backdrop-blur-xl text-white px-3 py-2 rounded-full shadow-2xl flex gap-1 border border-white/10 items-center">
-        <button onClick={() => setView('landing')} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${view === 'landing' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>Site</button>
-        <button onClick={() => setView('portal')} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${view === 'portal' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>Portal</button>
-        <button onClick={() => setView('dashboard')} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${view === 'dashboard' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>SaaS</button>
+      <div className="fixed bottom-3 md:bottom-6 left-3 md:left-6 right-3 md:right-auto z-[200] bg-slate-950/90 backdrop-blur-2xl text-white px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[2rem] shadow-2xl flex justify-center md:justify-start gap-2 md:gap-8 text-[9px] md:text-[11px] font-extrabold border border-white/10 items-center ring-1 ring-white/20">
+        <span className="hidden md:inline text-slate-600 uppercase tracking-[0.3em] border-r border-slate-800 pr-8 py-1">Controlo Master</span>
+        <button onClick={() => setCurrentView('landing')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'landing' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>1. SITE</button>
+        <button onClick={() => setCurrentView('portal')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'portal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>2. PORTAL</button>
+        <button onClick={() => setCurrentView('dashboard')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'dashboard' || currentView === 'login' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>3. PAINEL</button>
       </div>
 
       {renderView()}
