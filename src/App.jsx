@@ -11,7 +11,7 @@ const API_URL = 'https://pascale-juris-app.onrender.com/api';
 
 const TENANT_CONFIG = {
   name: "Renzo Associados",
-  primaryColor: "#0f172a", // CORRIGIDO: Hexadecimal real (Tailwind slate-900)
+  primaryColor: "#0f172a", 
   secondaryColor: "#0f172a",
   logoText: "PASCALE JURIS",
   advogado: "Dr. Renzo"
@@ -102,7 +102,6 @@ const Modal = ({ isOpen, onClose, title, children }) => {
   );
 };
 
-// Componente Inteligente de Busca Processual
 const SmartProcessLink = ({ processNumber, showToast }) => {
   if (!processNumber) return <span className="text-slate-400 text-xs italic">Sem numeração</span>;
   
@@ -293,7 +292,6 @@ const ClientPortal = ({ onNavigate, caseData, tenantConfig, showToast, onNotifyL
   const chatEndRef = useRef(null);
   const [file, setFile] = useState(null);
 
-  // Extração segura do nome do cliente caso venha como objeto do banco
   const clientNameStr = typeof caseData?.client === 'object' ? caseData.client?.name : (caseData?.client || 'Cliente');
 
   const { myFinancials, totalPendente } = useMemo(() => {
@@ -487,7 +485,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const [actionLoading, setActionLoading] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Extração segura de clientes (evita objeto React Child error)
   const activeClients = useMemo(() => {
     return Array.from(new Set(cases.map(c => typeof c.client === 'object' ? c.client?.name : c.client))).filter(Boolean);
   }, [cases]);
@@ -509,7 +506,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
   const wrapAction = async (fn, modalKey, msg) => {
     setActionLoading(true);
     const success = await fn();
-    if (success !== false) { // Assumindo que funções assíncronas podem não retornar strict booleans
+    if (success !== false) {
       setModals(m => ({ ...m, [modalKey]: false }));
       if(showToast) showToast(msg, 'success');
       if(modalKey === 'case') setFCase({ client: '', title: '', phone: '', cpf: '', processNumber: '', value: '' });
@@ -523,7 +520,6 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans relative">
-      {/* Menu Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-[60] md:hidden backdrop-blur-sm transition-opacity"
@@ -803,61 +799,64 @@ export default function App() {
     const token = localStorage.getItem('pascale_token');
     const headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
     const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
-    if (response.status === 401 || response.status === 403) throw new Error('Autenticação expirada');
+    
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Autenticação expirada');
+    }
+    if (!response.ok) {
+      throw new Error('Falha de comunicação com o servidor');
+    }
     return response;
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [casesRes, finRes, leadsRes, docsRes] = await Promise.all([
-          authFetch('/cases'),
-          authFetch('/financials'),
-          authFetch('/leads'),
-          authFetch('/documents')
-        ]);
+  const fetchAllData = useCallback(async () => {
+    try {
+      const [casesRes, finRes, leadsRes, docsRes] = await Promise.all([
+        authFetch('/cases'),
+        authFetch('/financials'),
+        authFetch('/leads'),
+        authFetch('/documents')
+      ]);
 
-        if (casesRes.ok) {
-          const casesData = await casesRes.json();
-          setCases(casesData.data.map(dbCase => ({
-            ...dbCase,
-            client: typeof dbCase.client === 'object' ? dbCase.client?.name : dbCase.client || 'Desconhecido',
-            phone: typeof dbCase.client === 'object' ? dbCase.client?.phone : '',
-            timeline: dbCase.timeline || []
-          })));
-        }
+      const casesData = await casesRes.json();
+      setCases(casesData.data.map(dbCase => ({
+        ...dbCase,
+        client: typeof dbCase.client === 'object' ? dbCase.client?.name : dbCase.client || 'Desconhecido',
+        phone: typeof dbCase.client === 'object' ? dbCase.client?.phone : '',
+        timeline: dbCase.timeline || []
+      })));
 
-        if (finRes.ok) {
-          const finData = await finRes.json();
-          setFinancials(finData.data.map(dbFin => ({
-             ...dbFin,
-             client: typeof dbFin.client === 'object' ? dbFin.client?.name : dbFin.client || 'Desconhecido'
-          })));
-        }
+      const finData = await finRes.json();
+      setFinancials(finData.data.map(dbFin => ({
+          ...dbFin,
+          client: typeof dbFin.client === 'object' ? dbFin.client?.name : dbFin.client || 'Desconhecido'
+      })));
 
-        if (leadsRes.ok) {
-          const leadsData = await leadsRes.json();
-          setLeads(leadsData.data.map(l => ({...l, date: new Date(l.createdAt).toLocaleDateString('pt-BR')})));
-        }
+      const leadsData = await leadsRes.json();
+      setLeads(leadsData.data.map(l => ({...l, date: new Date(l.createdAt).toLocaleDateString('pt-BR')})));
 
-        if (docsRes.ok) {
-          const docsData = await docsRes.json();
-          setDocuments(docsData.data);
-        }
+      const docsData = await docsRes.json();
+      setDocuments(docsData.data);
 
-      } catch (error) {
-        console.warn("Sessão expirada ou erro de nuvem.");
+    } catch (error) {
+      console.warn("Falha no carregamento de dados:", error);
+      if (error.message === 'Autenticação expirada') {
         setIsAuthenticated(false);
         setCurrentView('login');
-      } finally {
-        setLoadingData(false);
+      } else {
+        showToast("Servidor lento ou instável. Alguns dados podem não ter carregado.", "error");
       }
-    };
-    
-    if(isAuthenticated) {
-      fetchData();
+    } finally {
+      setLoadingData(false);
     }
-  }, [isAuthenticated]);
+  }, [showToast]);
+
+  useEffect(() => {
+    if(isAuthenticated) {
+      setLoadingData(true);
+      fetchAllData();
+    }
+  }, [isAuthenticated, fetchAllData]);
 
   const moveCase = async (caseId, newStageStr) => {
     const newStage = newStageStr || 'analise_juiz';
@@ -887,14 +886,14 @@ export default function App() {
       });
       const dbCase = await response.json();
       if(dbCase.success) {
-        setCases(prev => [{
-          ...dbCase.data,
-          client: newCaseData.client,
-          timeline: dbCase.data.timeline || []
-        }, ...prev]);
+        // Refetch garantido para sincronizar relacionamentos vazios do backend
+        await fetchAllData();
+      } else {
+        throw new Error('Falha no backend');
       }
     } catch (e) {
       console.error("Erro ao enviar processo:", e);
+      throw e; // Para o Toast reportar o erro
     }
   };
 
