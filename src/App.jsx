@@ -188,7 +188,7 @@ const LandingPage = ({ onNavigate, onAddLead, tenantConfig, showToast }) => {
         <div className="flex-1 space-y-8 animate-fade-in">
             <span className="inline-block px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-xs font-black uppercase tracking-widest border border-indigo-100">Escritório Digital 4.0</span>
             <h1 className="text-5xl md:text-7xl font-black leading-[1.1] text-slate-900 tracking-tighter">A sua justiça,<br/><span style={{ color: tenantConfig.primaryColor }}>transparente.</span></h1>
-            <p className="text-xl text-slate-500 leading-relaxed font-medium">Acompanhe o seu caso judicial em tempo real através do seu telemóvel. Respostas imediatas e consulta direta aos tribunais.</p>
+            <p className="text-xl text-slate-500 leading-relaxed font-medium">Acompanhe o seu caso judicial em tempo real através do seu celular. Respostas imediatas e consulta direta aos tribunais.</p>
             <div className="flex flex-col sm:flex-row gap-4 pt-6 justify-center lg:justify-start">
               <button onClick={() => setIsModalOpen(true)} className="px-10 py-5 text-white rounded-2xl font-black text-lg shadow-2xl hover:-translate-y-1 transition transform" style={{ backgroundColor: tenantConfig.primaryColor }}>Avaliar o Meu Caso</button>
               <button onClick={() => onNavigate('portal')} className="px-10 py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl font-black text-lg hover:bg-slate-50 transition">Já sou Cliente</button>
@@ -266,12 +266,12 @@ const LoginPage = ({ onLogin, tenantConfig, showToast }) => {
         </div>
         <form onSubmit={handleAuth} className="p-8 md:p-10 space-y-4">
           <input required type="email" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none focus:border-indigo-500" placeholder="E-mail Corporativo" onChange={e => setEmail(e.target.value)} />
-          <input required type="password" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none focus:border-indigo-500" placeholder="Palavra-passe" onChange={e => setPassword(e.target.value)} />
+          <input required type="password" className="w-full p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 outline-none focus:border-indigo-500" placeholder="Senha" onChange={e => setPassword(e.target.value)} />
           <button disabled={loading} className="w-full py-4 text-white rounded-2xl font-black shadow-xl disabled:opacity-70 flex justify-center items-center" style={{ backgroundColor: tenantConfig.primaryColor }}>
              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Acessar Sistema"}
           </button>
           <div className="mt-4 text-center">
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Login Demo: admin@lopes.pt / admin</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Login Demo: admin@admin.com / admin</p>
           </div>
         </form>
       </div>
@@ -561,7 +561,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
           </div>
           <div className="flex items-center gap-4 md:gap-6">
             <button onClick={() => setModals({...modals, [tab === 'finance' ? 'fin' : tab === 'docs' ? 'doc' : 'case']: true})} className="px-4 py-2.5 md:px-6 md:py-3.5 rounded-2xl text-white font-bold shadow-xl flex items-center gap-2 hover:-translate-y-1 transition-all text-xs md:text-sm" style={{ backgroundColor: tenantConfig.primaryColor }}>
-              <Plus className="w-4 h-4 md:w-5 md:h-5" /> <span className="hidden sm:inline">Lançar {tab === 'finance' ? 'Fatura' : tab === 'docs' ? 'Ficheiro' : 'Processo'}</span>
+              <Plus className="w-4 h-4 md:w-5 md:h-5" /> <span className="hidden sm:inline">Lançar {tab === 'finance' ? 'Fatura' : tab === 'docs' ? 'Arquivo' : 'Processo'}</span>
             </button>
             <div className="hidden md:flex items-center gap-4 pl-6 border-l border-slate-200">
                <div className="text-right">
@@ -617,7 +617,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
 
                           <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center gap-2">
                              <button onClick={() => window.open(`https://wa.me/55${(c.phone || '11999999999').replace(/\D/g,'')}`, '_blank')} className="text-green-600 bg-green-50 px-3 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase hover:bg-green-100 transition whitespace-nowrap">WhatsApp</button>
-                             {s !== 'sentenca' && <button onClick={() => wrapAction(() => onMove(c.id, s), '', 'Avanço de fase registado!')} className="flex-1 bg-slate-50 text-indigo-700 px-4 py-2 rounded-xl font-black text-[9px] md:text-[10px] hover:bg-indigo-50 hover:text-indigo-800 transition shadow-sm border border-slate-200 uppercase tracking-widest text-center truncate">Avançar ➔</button>}
+                             {s !== 'sentenca' && <button onClick={() => wrapAction(() => onMove(c.id, s), '', 'Avanço de fase registrado!')} className="flex-1 bg-slate-50 text-indigo-700 px-4 py-2 rounded-xl font-black text-[9px] md:text-[10px] hover:bg-indigo-50 hover:text-indigo-800 transition shadow-sm border border-slate-200 uppercase tracking-widest text-center truncate">Avançar ➔</button>}
                           </div>
                       </div>
                     )
@@ -712,7 +712,7 @@ const LawyerDashboard = ({ onNavigate, cases, onMoveCase, onAddCase, leads, docu
                                 <td className="p-6 md:p-8 text-right">{f.status !== 'Pago' && <button onClick={() => { onUpdateFinancial(f.id, "Pago"); if(showToast) showToast("Pagamento liquidado!", 'success'); }} className="bg-white text-green-600 font-extrabold hover:bg-green-600 hover:text-white px-3 md:px-5 py-2 rounded-xl border-2 border-green-500/20 text-[10px] transition-all duration-300 shadow-sm">Liquidar</button>}</td>
                              </tr>
                           ))}
-                           {(!financials || financials.length === 0) && <tr><td colSpan="6" className="p-8 text-center text-slate-400 font-bold">Nenhum registo financeiro.</td></tr>}
+                           {(!financials || financials.length === 0) && <tr><td colSpan="6" className="p-8 text-center text-slate-400 font-bold">Nenhum registro financeiro.</td></tr>}
                        </tbody>
                     </table>
                  </div>
@@ -1020,7 +1020,7 @@ export default function App() {
       {toast.visible && <Toast message={toast.message} type={toast.type} onClose={() => setToast(t => ({...t, visible: false}))} />}
 
       <div className="fixed bottom-3 md:bottom-6 left-3 md:left-6 right-3 md:right-auto z-[200] bg-slate-950/90 backdrop-blur-2xl text-white px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[2rem] shadow-2xl flex justify-center md:justify-start gap-2 md:gap-8 text-[9px] md:text-[11px] font-extrabold border border-white/10 items-center ring-1 ring-white/20">
-        <span className="hidden md:inline text-slate-600 uppercase tracking-[0.3em] border-r border-slate-800 pr-8 py-1">Controlo Master</span>
+        <span className="hidden md:inline text-slate-600 uppercase tracking-[0.3em] border-r border-slate-800 pr-8 py-1">Controle Master</span>
         <button onClick={() => setCurrentView('landing')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'landing' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>1. SITE</button>
         <button onClick={() => setCurrentView('portal')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'portal' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>2. PORTAL</button>
         <button onClick={() => setCurrentView('dashboard')} className={`px-3 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-2xl transition-all duration-300 tracking-tight ${currentView === 'dashboard' || currentView === 'login' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'hover:bg-white/5 text-slate-500'}`}>3. PAINEL</button>
